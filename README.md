@@ -2,6 +2,39 @@
 
 A monitoring agent for humanitarian assistance and disaster response (HADR).
 
+## What is HADR?
+
+**Humanitarian Assistance and Disaster Response (HADR)** is the coordinated
+effort to save lives, reduce suffering, and protect livelihoods in the wake of
+natural or human-made disasters — earthquakes, cyclones, floods, volcanic
+eruptions, droughts, wildfires, and the like. It spans the full arc of a crisis:
+
+- **Preparedness** — watching for hazards before they escalate and pre-positioning people, supplies, and plans.
+- **Response** — the first hours and days after an event, when responders need to know *what happened, where, how bad, and who is affected* to direct rescue, medical aid, shelter, food, and water.
+- **Recovery** — the longer effort to restore services and rebuild communities.
+
+HADR work is carried out by national disaster agencies, militaries, UN bodies
+(such as UN OCHA), the Red Cross / Red Crescent movement, and countless NGOs —
+who all depend on fast, accurate, shared situational awareness to act together.
+
+## What this application is for
+
+The single hardest problem in the first hours of a disaster is **information**:
+it is scattered across many feeds, arrives faster than any human can read it, is
+full of duplicates and false alarms, and is easy to miss overnight or across time
+zones. This agent exists to turn that firehose into a decision-ready picture.
+
+In a HADR scenario it can be used to:
+
+- **Detect early** — continuously watch authoritative disaster feeds (GDACS, USGS, ReliefWeb) so a significant event is noticed within minutes, day or night, without a human on watch.
+- **Cut the noise** — filter out minor tremors, routine updates, and false alarms, and de-duplicate the same physical event arriving from several feeds under different identifiers.
+- **Assess impact** — for each event that survives the filter, characterise *what happened, where, how severe, and who is affected*.
+- **Brief decision-makers** — publish a concise morning situation report to `dashboard.html` at 08:30 Singapore time, so responders and coordinators start the day with a shared, current picture.
+- **Run unattended, quietly** — operate on a schedule around the clock and stay silent when nothing has changed, so attention is spent only when it matters.
+
+The result is faster, better-informed decisions on where to send scarce
+responders, supplies, and attention — the core of effective disaster response.
+
 ## The end state
 
 By Wednesday afternoon this repository contains an agent that:
