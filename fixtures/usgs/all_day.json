@@ -1,0 +1,100 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1783342886000,
+    "title": "USGS All Earthquakes, Past Day",
+    "count": 5
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 6.8,
+        "place": "120 km SW of Padang, Indonesia",
+        "time": 1783300000000,
+        "updated": 1783300600000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 711,
+        "ids": ",us7000abcd,at00abcd,",
+        "type": "earthquake",
+        "title": "M 6.8 - 120 km SW of Padang, Indonesia"
+      },
+      "geometry": { "type": "Point", "coordinates": [99.6, -1.4, 30.0] },
+      "id": "us7000abcd"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 5.1,
+        "place": "42 km E of Hualien, Taiwan",
+        "time": 1783310000000,
+        "updated": 1783310500000,
+        "alert": null,
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 400,
+        "ids": ",us7000efgh,",
+        "type": "earthquake",
+        "title": "M 5.1 - 42 km E of Hualien, Taiwan"
+      },
+      "geometry": { "type": "Point", "coordinates": [121.9, 23.98, 18.4] },
+      "id": "us7000efgh"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 4.5,
+        "place": "9 km NNE of Avalon, CA",
+        "time": 1783320000000,
+        "updated": 1783320200000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 312,
+        "ids": ",ci41287863,us6000tafd,",
+        "type": "earthquake",
+        "title": "M 4.5 - 9 km NNE of Avalon, CA"
+      },
+      "geometry": { "type": "Point", "coordinates": [-118.3, 33.4, 12.1] },
+      "id": "ci41287863"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 3.0,
+        "place": "5 km SE of Ridgecrest, CA",
+        "time": 1783330000000,
+        "updated": 1783330100000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 138,
+        "ids": ",ci41290000,",
+        "type": "earthquake",
+        "title": "M 3.0 - 5 km SE of Ridgecrest, CA"
+      },
+      "geometry": { "type": "Point", "coordinates": [-117.6, 35.6, 8.0] },
+      "id": "ci41290000"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": null,
+        "place": "unknown region",
+        "time": 1783335000000,
+        "updated": 1783335050000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 0,
+        "ids": ",us7000zzzz,",
+        "type": "earthquake",
+        "title": "M ? - unknown region"
+      },
+      "geometry": { "type": "Point", "coordinates": [0.0, 0.0, 10.0] },
+      "id": "us7000zzzz"
+    }
+  ]
+}

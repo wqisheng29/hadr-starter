@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hadr"
+version = "0.1.0"
+description = "HADR earthquake monitor — deterministic core (slice 1: USGS -> ledger -> dashboard)"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx==0.27.2",
+    "Jinja2==3.1.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.3"]
+
+[tool.setuptools]
+packages = ["hadr"]
+
+[tool.setuptools.package-data]
+hadr = ["templates/*.j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

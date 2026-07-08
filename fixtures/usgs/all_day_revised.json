@@ -1,0 +1,64 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1783346486000,
+    "title": "USGS All Earthquakes, Past Day",
+    "count": 3
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 6.8,
+        "place": "120 km SW of Padang, Indonesia",
+        "time": 1783300000000,
+        "updated": 1783345000000,
+        "alert": "orange",
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 711,
+        "ids": ",us7000abcd,at00abcd,pt00abcd,",
+        "type": "earthquake",
+        "title": "M 6.8 - 120 km SW of Padang, Indonesia"
+      },
+      "geometry": { "type": "Point", "coordinates": [99.6, -1.4, 30.0] },
+      "id": "at00abcd"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 5.3,
+        "place": "42 km E of Hualien, Taiwan",
+        "time": 1783310000000,
+        "updated": 1783344000000,
+        "alert": null,
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 432,
+        "ids": ",us7000efgh,",
+        "type": "earthquake",
+        "title": "M 5.3 - 42 km E of Hualien, Taiwan"
+      },
+      "geometry": { "type": "Point", "coordinates": [121.9, 23.98, 18.4] },
+      "id": "us7000efgh"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 4.5,
+        "place": "9 km NNE of Avalon, CA",
+        "time": 1783320000000,
+        "updated": 1783320200000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 312,
+        "ids": ",ci41287863,us6000tafd,",
+        "type": "earthquake",
+        "title": "M 4.5 - 9 km NNE of Avalon, CA"
+      },
+      "geometry": { "type": "Point", "coordinates": [-118.3, 33.4, 12.1] },
+      "id": "ci41287863"
+    }
+  ]
+}

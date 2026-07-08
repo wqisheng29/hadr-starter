@@ -14,3 +14,9 @@ __pycache__/
 .venv/
 node_modules/
 .DS_Store
+*.egg-info/
+
+# Slice 1: the ledger is a produced artifact for now. ADR-0006 commits it, but
+# committing binary churn is premature until the single-writer / commit-on-change
+# logic (slice 7) exists. See implementation-notes.md.
+state/
