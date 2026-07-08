@@ -1,0 +1,4 @@
+# Slice 1 runtime + dev deps, pinned. feedparser/shapely arrive in later slices.
+httpx==0.27.2
+Jinja2==3.1.4
+pytest==8.3.3
