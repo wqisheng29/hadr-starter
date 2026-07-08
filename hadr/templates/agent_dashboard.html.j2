@@ -1,0 +1,54 @@
+{#
+  Agent-assessed dashboard. The deterministic core's `dashboard.html.j2` shows
+  raw feed fields; this one adds the LLM judgement layer's column — an impact
+  `assessment` per event (ADR-0001). Autoescape is on at the Environment level
+  because both feed text and model prose flow into this page.
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HADR situation report</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         max-width: 920px; margin: 0 auto; padding: 40px 24px; line-height: 1.5; color: #1a1a1a; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .as-of { color: #5b5b57; font-size: 0.9rem; margin: 0 0 8px; }
+  .summary { margin: 0 0 24px; font-size: 1rem; }
+  .empty { color: #5b5b57; font-style: italic; }
+  .events { list-style: none; padding: 0; margin: 0; }
+  .event { border: 1px solid #e4e2dd; border-radius: 6px; padding: 16px 18px; margin: 0 0 16px; }
+  .event h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  .event .meta { color: #5b5b57; font-size: 0.88rem; margin: 0 0 8px; }
+  .event .mag { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .event .assessment { margin: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HADR situation report</h1>
+  <p class="as-of">as of {{ as_of }}</p>
+</header>
+{% if summary %}
+<p class="summary">{{ summary }}</p>
+{% endif %}
+
+{% if events %}
+<ul class="events">
+  {% for e in events %}
+  <li class="event">
+    <h2>{{ e.title if e.title else "Untitled event" }}</h2>
+    <p class="meta">
+      {% if e.magnitude is defined and e.magnitude is not none %}<span class="mag">M{{ "%.1f"|format(e.magnitude) }}</span> · {% endif %}
+      {{ e.place if e.place else "location unknown" }}
+    </p>
+    {% if e.assessment %}<p class="assessment">{{ e.assessment }}</p>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty">No assessed events.</p>
+{% endif %}
+</body>
+</html>
