@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRD — HADR earthquake monitor</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1a1a1a; --muted: #5b5b57; --rule: #e4e2dd;
+    --card: #ffffff; --accent: #0b6b4f; --code-bg: #f0efec; --code-fg: #1a1a1a;
+    --quote-bg: #f4f3f0; --link: #0b6b4f;
+    --new:#0e8a16; --up:#b25000; --down:#8250df; --retract:#b30000; --aged:#5b5b57;
+    --new-bg:#e7f5e9; --up-bg:#fbeee2; --down-bg:#f1ecfb; --retract-bg:#fbe7e7; --aged-bg:#ececea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#16161a; --fg:#e9e8e4; --muted:#a4a29b; --rule:#2c2c31;
+      --card:#1d1d22; --accent:#4fd1a5; --code-bg:#26262c; --code-fg:#e9e8e4;
+      --quote-bg:#1f1f25; --link:#4fd1a5;
+      --new:#5bd66a; --up:#ff9d55; --down:#c8a5ff; --retract:#ff8080; --aged:#a4a29b;
+      --new-bg:#12331a; --up-bg:#33220f; --down-bg:#241a33; --retract-bg:#331313; --aged-bg:#26262c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#16161a; --fg:#e9e8e4; --muted:#a4a29b; --rule:#2c2c31;
+    --card:#1d1d22; --accent:#4fd1a5; --code-bg:#26262c; --code-fg:#e9e8e4;
+    --quote-bg:#1f1f25; --link:#4fd1a5;
+    --new:#5bd66a; --up:#ff9d55; --down:#c8a5ff; --retract:#ff8080; --aged:#a4a29b;
+    --new-bg:#12331a; --up-bg:#33220f; --down-bg:#241a33; --retract-bg:#331313; --aged-bg:#26262c;
+  }
+  :root[data-theme="light"] {
+    --bg:#fbfbfa; --fg:#1a1a1a; --muted:#5b5b57; --rule:#e4e2dd;
+    --card:#ffffff; --accent:#0b6b4f; --code-bg:#f0efec; --code-fg:#1a1a1a;
+    --quote-bg:#f4f3f0; --link:#0b6b4f;
+    --new:#0e8a16; --up:#b25000; --down:#8250df; --retract:#b30000; --aged:#5b5b57;
+    --new-bg:#e7f5e9; --up-bg:#fbeee2; --down-bg:#f1ecfb; --retract-bg:#fbe7e7; --aged-bg:#ececea;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65; font-size: 17px;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 48px 24px 96px; }
+  header.doc { border-bottom: 2px solid var(--rule); padding-bottom: 24px; margin-bottom: 8px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin: 0 0 18px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.86rem; color: var(--muted); }
+  .meta strong { color: var(--fg); font-weight: 600; }
+  h2 {
+    font-size: 1.4rem; margin: 2.4em 0 0.6em; padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule); letter-spacing: -0.01em;
+  }
+  h3 { font-size: 1.08rem; margin: 1.7em 0 0.4em; color: var(--fg); }
+  h3 .q {
+    font-size: 0.7rem; font-weight: 700; color: #fff; background: var(--accent);
+    border-radius: 5px; padding: 2px 7px; margin-right: 8px; vertical-align: middle;
+    letter-spacing: 0.03em;
+  }
+  p { margin: 0.7em 0; }
+  a { color: var(--link); text-decoration: none; border-bottom: 1px solid transparent; }
+  a:hover { border-bottom-color: currentColor; }
+  blockquote {
+    margin: 1.2em 0; padding: 14px 18px; background: var(--quote-bg);
+    border-left: 4px solid var(--accent); border-radius: 0 6px 6px 0;
+    color: var(--fg); font-size: 0.96rem;
+  }
+  blockquote p:first-child { margin-top: 0; } blockquote p:last-child { margin-bottom: 0; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg); color: var(--code-fg); padding: 1.5px 5px;
+    border-radius: 4px; font-size: 0.86em; word-break: break-word;
+  }
+  ol, ul { padding-left: 1.4em; margin: 0.6em 0; }
+  li { margin: 0.32em 0; }
+  li::marker { color: var(--muted); }
+  ol.stories li { margin: 0.5em 0; padding-left: 4px; }
+  ol.stories li strong { color: var(--accent); }
+  .grouplabel { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 700; margin: 1.6em 0 0.3em; }
+  .tag {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 1px 8px;
+    border-radius: 20px; margin-right: 2px; letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .t-new { color: var(--new); background: var(--new-bg); }
+  .t-up { color: var(--up); background: var(--up-bg); }
+  .t-down { color: var(--down); background: var(--down-bg); }
+  .t-retract { color: var(--retract); background: var(--retract-bg); }
+  .t-aged { color: var(--aged); background: var(--aged-bg); }
+  .callout {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 4px 20px; margin: 1.1em 0;
+  }
+  footer.doc { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--rule);
+    color: var(--muted); font-size: 0.82rem; }
+  @media (max-width: 560px) { body { font-size: 16px; } h1 { font-size: 1.6rem; } .wrap { padding: 32px 18px 72px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <h1>PRD: HADR earthquake monitor</h1>
+  <p class="subtitle">The self-correcting 08:30 sitrep</p>
+  <div class="meta">
+    <span><strong>Scope:</strong> earthquakes, end to end (USGS · GDACS · ReliefWeb)</span>
+    <span><strong>Stage:</strong> build-plan-product · step B</span>
+    <span><strong>Status:</strong> ready-for-agent</span>
+    <span><strong>Issue:</strong> <a href="https://github.com/wqisheng29/hadr-starter/issues/3">#3</a></span>
+    <span><strong>Basis:</strong> ADR-0001–0008 · CONTEXT.md</span>
+  </div>
+</header>
+
+<blockquote>
+  <p><strong>Step B of <code>build-plan-product</code>.</strong> The architecture is already fixed by
+  ADR-0001–0008 and <code>CONTEXT.md</code>; this PRD resolves the five product/policy questions that
+  <code>CONTEXT.md</code> deferred "for the PRD" and specifies the product behaviour. <strong>Scope for
+  this build: earthquakes, end to end</strong> across the three feeds. Other GDACS hazard types are out
+  of scope for the build; the design is meant to generalise to them later.</p>
+  <p>Two runtime decisions taken during review are folded in: the scheduled ticks run <strong>hybrid</strong>
+  (08:30 brief on GitHub Actions, fast tick as a harness agent), and urgent alerts are
+  <strong>confirmation-only</strong> (no magnitude-only push).</p>
+</blockquote>
+
+<h2>Problem Statement</h2>
+<p>I coordinate disaster response, and in the first hours of an earthquake the thing that fails me is not
+effort — it is <strong>information</strong>. What I need in order to act (what happened, where, how bad,
+who is affected) is scattered across several authoritative feeds, arrives faster than I can read it, and
+is thick with duplicates and false alarms: the same quake reaches me three times under three different
+identifiers, sitting in a list alongside dozens of minor tremors that look exactly like it.</p>
+<p>Worse, these feeds are not bulletins — they are <strong>mutable databases</strong>. A magnitude is
+revised down a day later; an alert colour is downgraded; an event is deleted outright. Every tool I have
+reports once and never looks back, so I am never told that something I acted on yesterday is <em>no
+longer true</em>. And none of this waits for office hours: the events I most need to know about happen
+overnight, in other time zones, when no one is on watch.</p>
+<p>I cannot keep a human staring at three feeds around the clock — and even if I could, they could not
+reliably de-duplicate, filter, and (hardest of all) track what has quietly changed underneath a report
+they already trusted.</p>
+
+<h2>Solution</h2>
+<p>An unattended monitor that watches USGS, GDACS and ReliefWeb continuously and keeps <strong>one
+reconciled picture of active earthquake events</strong> — so the same quake arriving from three feeds is
+one <strong>canonical event</strong>, and minor noise is filtered out before it reaches me.</p>
+<p>It behaves in three ways (ADR-0002):</p>
+<ul>
+  <li><strong>Silent by default.</strong> It keeps its picture current without interrupting me. "Noticed
+  within minutes" means <em>recorded in the ledger</em> (on the next tick), not <em>alerted</em>.</li>
+  <li><strong>Urgent when it must be.</strong> A severe, high-confidence event breaks the silence
+  immediately with a push notification, before the morning brief (ADR-0007).</li>
+  <li><strong>A briefing every morning at 08:30 Singapore time.</strong> One decision-ready situation
+  report, published to <code>dashboard.html</code>.</li>
+</ul>
+<p>Its distinctive promise: the <strong>briefing leads with what changed since the last brief — including
+what it previously told me that is no longer true</strong> (new, upgraded, downgraded, corrected,
+retracted). And it states plainly what it <em>cannot</em> see, so I never mistake its silence for the
+absence of a disaster.</p>
+
+<h2>User Stories</h2>
+
+<div class="grouplabel">Detection &amp; coverage</div>
+<ol class="stories" start="1">
+  <li>As a coordinator, I want authoritative earthquake feeds watched around the clock, so that a significant quake is noticed within minutes whether or not anyone is on duty.</li>
+  <li>As a duty officer, I want the monitor to run unattended on a schedule, so that overnight and cross-time-zone events are not missed because a human was asleep.</li>
+  <li>As a coordinator, I want a quake detected by USGS within minutes to already be in the picture by the time GDACS and ReliefWeb catch up, so that I benefit from the fastest feed without waiting for the slowest.</li>
+  <li>As an analyst, I want each morning brief to state plainly what the monitor cannot see (floods, landslides, heat, conflict; that global completeness is only ~M4.5–5.0; that <code>tsunami:1</code> is a flag, not a NOAA tsunami warning), so that I never mistake its silence for safety.</li>
+  <li>As a coordinator, I want the brief to say when a feed was unreachable at run time, so that a gap in the data is visible rather than hidden.</li>
+</ol>
+
+<div class="grouplabel">Cutting the noise &amp; de-duplicating</div>
+<ol class="stories" start="6">
+  <li>As a coordinator, I want the same physical earthquake arriving from USGS and GDACS to appear as one canonical event, not two, so that my picture is not double-counted.</li>
+  <li>As an analyst, I want a quake whose USGS identifier set or preferred <code>id</code> changes over its life to remain the <em>same</em> canonical event, so that revisions don't spawn phantom duplicates.</li>
+  <li>As a coordinator, I want routine minor tremors (e.g. Green ~M4.5 quakes with no impact signal) filtered out of the headline, so that my attention is spent only on events that could matter.</li>
+  <li>As an analyst, I want a ReliefWeb disaster record tied back to the GDACS/USGS event it describes (via GLIDE when present, or a recorded fuzzy match otherwise), so that humanitarian context attaches to the right event.</li>
+  <li>As a coordinator, I want de-duplication and filtering to be reproducible, so that the same inputs always yield the same picture and I can trust it.</li>
+</ol>
+
+<div class="grouplabel">Provisional vs. confirmed</div>
+<ol class="stories" start="11">
+  <li>As a duty officer, I want a brand-new quake shown as <em>provisional</em> until an impact signal lands, so that I understand an early read (magnitude/location only) may still move.</li>
+  <li>As a coordinator, I want an event promoted to <em>confirmed</em> once PAGER / GDACS impact scoring (or a reviewed USGS status) arrives, so that I know when a read has firmed up.</li>
+  <li>As an analyst, I want the brief to never present a provisional read as if it were settled, so that I don't over-commit resources on a number that has not been reviewed.</li>
+</ol>
+
+<div class="grouplabel">Urgent alerts (breaking silence)</div>
+<ol class="stories" start="14">
+  <li>As a duty officer, I want an immediate push when a severe, high-confidence earthquake appears (GDACS Red, or USGS PAGER Orange/Red), so that I can act before 08:30.</li>
+  <li>As a duty officer, I want <em>not</em> to be paged for a strong-but-unconfirmed quake with no impact signal yet, so that I am not woken for a deep offshore M7 that affects no one.</li>
+  <li>As a duty officer, I want at most one push per event unless its severity genuinely escalates (e.g. Orange→Red), so that a stream of episode updates does not become alert spam.</li>
+  <li>As a duty officer, I want downgrades and retractions to <em>never</em> arrive as an urgent push, so that only genuinely urgent, actionable news breaks my silence (corrections wait for the 08:30 brief).</li>
+  <li>As a coordinator, I want the urgent-alert decision to be made deterministically (never dependent on the LLM), so that whether I get paged is reproducible and defensible.</li>
+</ol>
+
+<div class="grouplabel">The 08:30 briefing</div>
+<ol class="stories" start="19">
+  <li>As a coordinator, I want one situation report published to <code>dashboard.html</code> at 08:30 Singapore time, so that I start the day with a shared, current picture.</li>
+  <li>As a coordinator, I want the brief to open with <strong>what changed since the last brief</strong> — new / upgraded / downgraded / corrected / retracted — so that I read the delta first, not re-read yesterday.</li>
+  <li>As a coordinator, I want each active event characterised by <em>impact</em> (expected affected population, alert colour, PAGER loss bins, humanitarian signals), not magnitude alone, so that I prioritise by consequence, not by number.</li>
+  <li>As a coordinator, I want ongoing-but-unchanged events summarised below the fold rather than re-headlined, so that the top of the brief is only what's new or moved.</li>
+  <li>As a coordinator, I want a clear "no material change" brief on a quiet morning (and no push), so that quiet is stated deliberately rather than left ambiguous.</li>
+  <li>As an analyst, I want each event to link out to its sources (USGS/GDACS/ReliefWeb) with proper attribution, so that I can drill into the primary record.</li>
+</ol>
+
+<div class="grouplabel">Corrections &amp; retractions (the distinctive feature)</div>
+<ol class="stories" start="25">
+  <li>As a coordinator, I want a correction stated explicitly as "we said X → it is now Y → because the source revised it," so that I can trust the monitor precisely <em>because</em> it admits what changed.</li>
+  <li>As a coordinator, I want a magnitude revision (e.g. M6.8 → M6.1) surfaced as a correction with its impact re-assessed, so that I can scale back a response that no longer fits.</li>
+  <li>As a coordinator, I want an event the source <em>positively withdrew</em> (a USGS deletion, or a GDACS record removed) reported as a <strong>retraction</strong>, so that I stop acting on something no longer real — while a mere colour drop (even to Green) is reported as a <strong>downgrade</strong>, not a retraction.</li>
+  <li>As an analyst, I want an event that merely aged out of a feed's window reported as "no longer in feed window; not confirmed ended" — distinct from a retraction — so that I don't read normal windowing as an all-clear.</li>
+  <li>As a coordinator, I want corrections attributed to the feed's revision (the mutability model), not phrased as the monitor's mistake, so that the wording builds trust rather than doubt.</li>
+</ol>
+
+<div class="grouplabel">Operating unattended &amp; trustworthy</div>
+<ol class="stories" start="30">
+  <li>As a maintainer, I want the monitor to poll politely within each feed's limits (ReliefWeb ≤1000 calls/day; USGS gzip + <code>If-Modified-Since</code>; GDACS delta-poll on <code>datemodified</code>), so that it doesn't get rate-limited or blocked.</li>
+  <li>As a maintainer, I want a feed outage (503, invalid XML, timeout) to degrade gracefully — keep the last known state for that feed and note the gap — rather than crash or corrupt the ledger.</li>
+  <li>As a maintainer, I want state to persist durably between scheduled runs, so that "what changed since yesterday" survives across stateless cloud invocations.</li>
+  <li>As a reviewer, I want a human-readable record of what each briefing asserted, so that I can audit past briefs even though the ledger DB itself diffs opaquely in git.</li>
+  <li>As a maintainer, I want the expensive model step to run <em>only when the deterministic check says something changed</em>, so that a scheduled run that does nothing costs neither money nor trust.</li>
+  <li>As a maintainer, I want ReliefWeb report bodies handled as third-party copyright (link + short excerpt + attribution only), so that the monitor respects licensing and the AI-content clause.</li>
+  <li>As a reviewer, I want every LLM-made fuzzy link decision recorded in the ledger and overridable, so that a mis-link can be corrected and the picture stays reproducible thereafter.</li>
+  <li>As a maintainer, I want the deterministic core to be exercisable from recorded feed fixtures with a frozen clock, so that I can prove behaviour without hitting the network or waiting for real events.</li>
+  <li>As an operator, I want to run the whole pipeline on demand (not only on the schedule), so that I can validate a change end to end before trusting it overnight.</li>
+  <li>As a coordinator, I want the brief to carry a clear "as of" timestamp in Singapore time, so that I know exactly how current the picture is.</li>
+  <li>As a maintainer, I want the schedule to be a lightweight ~30-minute poll+triage tick plus the 08:30 briefing run, so that operating cost matches the two very different cost profiles of ingest vs. briefing.</li>
+</ol>
+
+<h2>Implementation Decisions</h2>
+
+<h3>Runtime split (ADR-0001, ADR-0008)</h3>
+<ul>
+  <li>The <strong>deterministic core</strong> (Python) owns the hot path end to end: fetch, parse, cross-feed identity, the ledger, change detection, the noise filter, and the urgent-alert <em>decision and message</em>. Same input → same ledger state.</li>
+  <li>The <strong>LLM/agent layer</strong> is confined to judgement + prose, and only at 08:30: impact assessment, the fuzzy cross-feed tie-break, and writing the brief. <strong>No LLM on the urgent path.</strong></li>
+  <li>Modules by responsibility (per ADR-0008): a <strong>fetcher</strong> (feeds → normalised records), a <strong>matcher</strong> (records → <code>canonical_id</code>), a <strong>ledger</strong> (reconcile + change-detect + persist), and a <strong>briefer</strong> (diff + render). A thin <strong>change-detection/triage</strong> step decides whether the model runs at all.</li>
+</ul>
+
+<h3>Scope &amp; the three layers</h3>
+<p><strong>USGS = detection</strong> (earthquakes, minutes), <strong>GDACS = triage</strong> (impact-scored colour), <strong>ReliefWeb = confirmation/context</strong> (curated prose). The build wires all three, for earthquakes only.</p>
+
+<h3>Cross-feed identity — <code>canonical_id</code> (ADR-0004)</h3>
+<p>Two tiers. <strong>Deterministic (all in code, covers the fast path):</strong> union of USGS <code>ids</code>; GDACS <code>(eventtype, eventid)</code>; the GDACS <code>source</code>/<code>sourceid</code> → USGS <code>id</code> crosswalk (NEIC-sourced quakes are near-exact); GLIDE → ReliefWeb↔GDACS; and spatiotemporal blocking (same hazard, time window, distance, magnitude tolerance) with thresholds in config. <strong>LLM tie-break at 08:30 only:</strong> the fuzzy residual (mostly ReliefWeb prose ↔ hazard events) is resolved by the model, its decision <strong>written to the ledger and overridable</strong>. The urgent-alert path is fully deterministic and never varies with the LLM.</p>
+
+<h3>Ledger model &amp; write coordination (ADR-0003, ADR-0006)</h3>
+<p>One row per <strong>canonical event</strong> holding the latest reconciled values, plus a stored <strong>published snapshot</strong> of what each briefing asserted. "What changed since yesterday" = diff current state vs. the last published snapshot. Persisted as <strong>SQLite committed to the repo</strong> (<code>state/ledger.db</code>). Because the DB diffs opaquely in git, each briefing is <strong>also committed as a readable file</strong> (<code>state/published/&lt;date&gt;.json</code> and/or rendered markdown) to preserve an inspectable audit trail.</p>
+<div class="callout">
+<p><strong>Write coordination (refines ADR-0006).</strong> ADR-0006 assumed a single schedule serialised all writes; under the hybrid runtime (below) two schedulers run, so that assumption no longer holds — and a binary <code>.db</code> cannot be git-merged. Therefore the <strong>fast tick is the sole writer of <code>ledger.db</code></strong> and commits it <strong>only when the reconciled state actually changed</strong>; the 08:30 brief only <em>reads</em> the ledger and writes <strong>disjoint</strong> paths (<code>state/published/&lt;date&gt;.json</code>, <code>dashboard.html</code>), and the LLM's fuzzy-link decisions are emitted to a disjoint file the next tick applies. Every commit does pull-<code>--rebase</code>-and-retry; touching disjoint paths keeps the rebase conflict-free.</p>
+<p><strong>Canonical-event record</strong> (shape, not code): assigned <code>canonical_id</code>; hazard type; first-seen / last-updated; <strong>status ∈ {provisional, confirmed, retracted, aged_out}</strong>; severity fields — GDACS <strong><code>alertlevel</code></strong> (event-max, i.e. "was it ever severe") <strong>and <code>episodealertlevel</code></strong> (latest, <em>authoritative</em> for current severity), PAGER alert, magnitude, depth; the <strong>last alert level pushed</strong> (so the one-push-per-event rule survives stateless ticks); geometry + origin time; per-feed references (USGS <code>ids</code> set, GDACS <code>eventid</code>+<code>episodeid</code>, ReliefWeb id + GLIDE); recorded LLM link decisions; and per-feed provenance / last-modified.</p>
+</div>
+
+<h3><span class="q">Q1</span> Hazard scope — earthquakes, end to end</h3>
+<p>USGS + GDACS + ReliefWeb, quakes only, at full depth (dedup, provisional→confirmed, corrections/retractions, fuzzy ReliefWeb linking). Chosen because the cross-feed identity story is cleanest for quakes (the GDACS <code>source</code>/<code>sourceid</code> crosswalk) and the fast alert path is almost entirely USGS↔GDACS quakes. Other GDACS hazards are out of scope for the build.</p>
+
+<h3><span class="q">Q2</span> Urgent-alert threshold — "severe + high-confidence"</h3>
+<ul>
+  <li><strong>Severe</strong> is <em>impact-based, not magnitude-based</em>: <strong>GDACS latest-episode alert Red</strong> (<code>episodealertlevel</code>, not the monotonic event-max <code>alertlevel</code>), <strong>or</strong> USGS <strong>PAGER alert Orange or Red</strong>.</li>
+  <li><strong>High-confidence</strong> = the impact signal has <em>settled</em> and the event is <strong>confirmed</strong> (not provisional). For PAGER, Orange/Red are human-reviewed before release, so their presence <em>is</em> the confidence. For <strong>GDACS Red</strong>, the parallel bar is a <strong>settled ShakeMap / episode impact score</strong> (GDACS EQ alerts wait up to ~25 min for ShakeMap) — an early, pre-ShakeMap Red is still <em>provisional</em> and does <strong>not</strong> fire. Raw magnitude alone never fires.</li>
+  <li><strong>No extreme-magnitude escape hatch</strong> (per decision): a strong-but-unconfirmed quake does not push. Accepted tradeoff — up to ~20–40 min delay on the rare catastrophe in exchange for near-zero false alarms.</li>
+  <li><strong>De-duplicated &amp; escalation-only:</strong> at most one push per canonical event (enforced via the persisted <em>last alert level pushed</em>, so it holds across stateless ticks); push again only on a genuine escalation (e.g. Orange→Red). <strong>Downgrades and retractions never push</strong> — they wait for the 08:30 brief.</li>
+  <li>Both the fire/no-fire <strong>decision and the push message are deterministic</strong> (ledger facts in a fixed template); no LLM on the urgent path (ADR-0001, ADR-0004, ADR-0007). Narrative impact assessment is a briefing-time activity (Q4).</li>
+</ul>
+
+<h3><span class="q">Q3</span> Noise filter &amp; provisional→confirmed promotion</h3>
+<ul>
+  <li><strong>Enters the ledger</strong> (becomes a canonical event) when it clears a materiality gate using each feed's own layer semantics: present in <strong>GDACS</strong> (any colour) <strong>or</strong> <strong>ReliefWeb</strong> (curated ⇒ it matters), <strong>or</strong> from <strong>USGS at magnitude ≥ ~M4.5</strong> (threshold in config). The ~M4.5 floor is chosen because USGS global completeness is only ~M4.5–5.0 — below it, <em>absence</em> is unreliable, so a lower floor would persist noise without buying coverage. Sub-threshold USGS micro-quakes are dropped, not persisted.</li>
+  <li><strong>Green/low events that clear the gate are still persisted</strong> (just not featured) — precisely so a later escalation (Green→Orange→Red) is detectable as a <em>change</em> against the last snapshot. Persist-to-detect, headline-by-impact.</li>
+  <li><strong>Provisional</strong> on first detection (USGS <code>status=automatic</code>; GDACS before ShakeMap/impact scoring; <code>PAGER=null</code>). <strong>Confirmed</strong> when an impact signal settles: PAGER non-null, GDACS episode carries settled impact scoring/ShakeMap, or USGS status flips <code>automatic</code>→<code>reviewed</code>. (Expect provisional for the first tick or two: PAGER is null ~20–40 min; GDACS EQ alerts wait up to ~25 min for ShakeMap.)</li>
+  <li>Alert gating uses <strong>confirmed severity only</strong>; the headline of the brief is drawn from material events, with routine Green quakes summarised, not featured.</li>
+</ul>
+
+<h3><span class="q">Q4</span> Impact assessment &amp; enrichment (briefing-time)</h3>
+<p>At <strong>briefing time (08:30 only</strong> — the urgent push carries only deterministic facts, Q2), the LLM layer enriches each surviving canonical event by pulling: USGS <strong>PAGER</strong> (fatality/economic-loss probability bins, population exposure), <strong>ShakeMap</strong> (shaking intensity / MMI and population within intensity bands), <strong>GDACS event detail</strong> (<code>url.details</code>, impact scoring, affected country/population), and the <strong>ReliefWeb</strong> narrative (short excerpt + link) for humanitarian context. Severity is characterised in impact terms and the brief <strong>states the basis</strong> (e.g. "GDACS Red; PAGER Orange — est. N exposed at MMI ≥ VI"). The numbers cited come from the pulled products; the deterministic ledger owns which events are in scope and their reconciled identity/severity.</p>
+
+<h3><span class="q">Q5</span> Change classification &amp; retraction wording</h3>
+<p>The briefing opens with a <strong>"Since the last brief"</strong> section computed as the diff of current ledger state vs. the last published snapshot, classified by <strong>impact tier</strong> (GDACS <code>episodealertlevel</code> + PAGER):</p>
+<ul>
+  <li><span class="tag t-new">New</span> canonical event present now, absent from the last snapshot.</li>
+  <li><span class="tag t-up">Upgraded</span> present in both; impact tier increased (episode colour up, PAGER up, or provisional→confirmed-severe).</li>
+  <li><span class="tag t-down">Downgraded</span> present in both; impact tier decreased. <strong>A colour drop — including all the way to Green — is a Downgrade, not a retraction</strong> (the event is real, just reassessed as minor).</li>
+  <li><span class="tag t-retract">Retracted</span> was in the last snapshot; <strong>positively withdrawn by the source</strong> — a USGS deletion, or a GDACS record removed. A pure magnitude revision that doesn't move the tier is surfaced as a <strong>correction</strong> on the event, not a re-ranking.</li>
+  <li><span class="tag t-aged">Aged out</span> no longer in a feed's window but <em>not</em> confirmed ended (a ~4-day GDACS drop-out ≠ event over). <strong>On the ReliefWeb RSS feed we cannot tell a withdrawal from a window scroll-out or a normal <code>alert</code>→<code>current/past</code> transition, so a disappeared ReliefWeb item is treated as aged-out unless corroborated</strong> — never a confirmed retraction (that needs the API <code>status</code> field, deferred).</li>
+  <li><span class="tag t-aged">Ongoing</span> present in both, unchanged — folded below the fold, not re-headlined.</li>
+</ul>
+<p>If the diff is empty, the 08:30 brief still publishes deterministically as <strong>"no material change since the last brief"</strong> with the LLM step gated off — quiet is <em>stated</em>, not silent-by-absence.</p>
+<p>Corrections are phrased for trust: <strong>"we said X → it is now Y → because the source revised it,"</strong> attributed to the feed's revision (the mutability model), never as the monitor's own error where the feed changed underneath it. A previously reported event is never silently dropped.</p>
+
+<h3>Scheduling &amp; delivery (hybrid; refines ADR-0005, ADR-0007)</h3>
+<p><strong>Two schedulers, split by what each needs:</strong></p>
+<ul>
+  <li>The <strong>08:30 Asia/Singapore briefing</strong> runs in <strong>GitHub Actions</strong> (the scaffolded <code>sitrep.yml</code>) — it publishes <code>dashboard.html</code>, needs no push, and expresses the deterministic gate cleanly. (08:30 SGT = <code>30 0 * * *</code> UTC; Singapore has no DST.)</li>
+  <li>The <strong>~30-minute poll+triage tick</strong> runs as a <strong>harness scheduled cloud agent</strong>, because the urgent push (ADR-0007) needs a Claude Code agent context that CI does not provide. It shells out to the deterministic Python and does minimal agent reasoning. This hybrid <strong>refines ADR-0005</strong>, which assumed one mechanism.</li>
+</ul>
+<p>The gate is load-bearing: a <strong>deterministic change-check decides whether anything changed; the headless model runs only if it did</strong> — the model never decides whether to wake up. Detection latency is bounded by the tick interval, so "noticed within minutes" means <em>recorded promptly on the next ~30-min tick</em>, not sub-minute.</p>
+<p><strong>Delivery.</strong> Urgent alerts go out via the harness's own <strong>push notification</strong>, to the <strong>operator only</strong> (who, in this build, is also the coordinator; team broadcast is deferred). The push is <strong>best-effort</strong> — no delivery ack or retry.</p>
+<p><strong>Secrets.</strong> The Actions brief needs a <strong>model API credential</strong> as a repo secret plus write access to commit (<code>GITHUB_TOKEN</code> covers the commit); the harness tick's secrets live in its agent environment (ADR-0005). This is the one place the "no-secrets" framing of ADR-0005/0007 actually needs a secret.</p>
+
+<h2>Testing Decisions</h2>
+<p><strong>What makes a good test here:</strong> it asserts <strong>external behaviour</strong> at a high seam, not implementation detail; it is <strong>deterministic</strong> given recorded inputs and a frozen clock; and it makes <strong>no assertion on generated prose</strong>. Two seams, because the deterministic core (assert exact state) and the LLM layer (inherently non-deterministic) need different regimes.</p>
+
+<h3>Seam 1 (primary): the feed-fetch boundary</h3>
+<p>Everything downstream of <em>parsed feed records</em> is pure. Tests inject <strong>recorded feed fixtures</strong> (GDACS <code>EVENTS4APP</code> JSON, USGS <code>all_day.geojson</code>, ReliefWeb RSS) plus a <strong>frozen clock</strong>, run the whole deterministic pipeline, and assert on: reconciled <strong>ledger state</strong> (canonical events, statuses, severity), the <strong>change-classification</strong> (new/upgraded/downgraded/retracted/aged-out), the <strong>noise filter</strong>, <strong>provisional→confirmed</strong> transitions, and the <strong>urgent-alert decision + message <em>as data</em></strong> (a record/return value — no real push, no network). This is the highest deterministic seam and covers the hot path end to end. The push channel and the git commit are <strong>dumb sinks</strong>, verified as the upstream decision, not exercised for real.</p>
+<p>Fixture-driven scenarios (each an external-behaviour test), driven as multi-tick sequences where mutation matters:</p>
+<ol>
+  <li>Same quake from USGS + GDACS (GDACS <code>source=NEIC</code>, <code>sourceid</code>=USGS id) ⇒ <strong>one</strong> canonical event.</li>
+  <li>USGS magnitude revision M6.8 → M6.1 across ticks ⇒ ledger updates; surfaced as a <strong>correction</strong> (tier unchanged) or <strong>Downgraded</strong> (tier drops).</li>
+  <li>USGS <code>ids</code> set / preferred <code>id</code> changes ⇒ still <strong>one</strong> canonical event (union of ids).</li>
+  <li>USGS deletion ⇒ <strong>Retracted</strong>; a GDACS record removed ⇒ <strong>Retracted</strong> (positive withdrawal only).</li>
+  <li>GDACS <code>episodealertlevel</code> Orange → Red ⇒ <strong>Upgraded</strong> + urgent-alert fires <strong>once</strong>, and does <strong>not</strong> re-fire on the next tick (the pushed level is persisted).</li>
+  <li>GDACS episode Red → Green ⇒ <strong>Downgraded</strong>; <strong>no</strong> push; <strong>not</strong> a retraction; surfaces only at 08:30.</li>
+  <li>Green ~M4.5 swarm ⇒ persisted but filtered from the headline; <strong>no</strong> alert.</li>
+  <li>Provisional strong quake (<code>PAGER=null</code>, or a pre-ShakeMap GDACS Red) ⇒ provisional, no alert; when PAGER Orange / a settled ShakeMap lands next tick ⇒ <strong>confirmed + alert</strong>.</li>
+  <li>Event leaves the GDACS ~4-day window ⇒ <strong>aged out</strong> ("not confirmed ended"); a ReliefWeb item that disappears from RSS is likewise <strong>aged-out</strong>, not retracted.</li>
+  <li>Feed returns 503 / invalid XML ⇒ pipeline degrades; that feed's state unchanged; the gap is recorded for the brief.</li>
+  <li>Nothing changed since the last snapshot ⇒ the brief publishes a deterministic <strong>"no material change"</strong> state with the model gated off; <strong>no</strong> push.</li>
+  <li>ReliefWeb GLIDE ties to a GDACS/USGS event ⇒ deterministic GLIDE join; a prose-only ReliefWeb item ⇒ given a <strong>recorded</strong> LLM link decision, the merge reconciles correctly.</li>
+</ol>
+
+<h3>Seam 2: the LLM boundary at 08:30</h3>
+<p>The briefing run computes a deterministic diff (tested at Seam 1) and hands it to a <strong>stubbed model</strong>. Tests assert the <strong>brief-assembly wiring</strong> (diff → the inputs handed to the model → the <em>structure</em> of the rendered <code>dashboard.html</code>: the "Since the last brief" buckets, the "cannot see" disclosure, source links) and that a <strong>written fuzzy-link decision reconciles</strong> as in scenario 12 — never the prose itself.</p>
+
+<h3>Modules under test &amp; prior art</h3>
+<p>Under test: the deterministic pipeline from the fetch boundary inward, plus the brief-assembly wiring with a stubbed model. <strong>Prior art: none in-repo</strong> — this is greenfield, so this PRD <em>establishes</em> the fixture-driven, frozen-clock, golden-ledger pattern as the house style. It aligns with the existing house rule in <code>scripts/README.md</code> ("anything that must give the same answer twice does not belong in a prompt"). Learnings that cost &gt;10 minutes are captured in <code>docs/solutions/</code> per that directory's convention.</p>
+
+<h2>Out of Scope</h2>
+<ul>
+  <li><strong>Non-earthquake hazards</strong> (cyclones, floods, volcanoes, drought, wildfire). The architecture is meant to generalise, but they are not built this week.</li>
+  <li><strong>Tsunami warnings</strong> (those are NOAA / tsunami.gov; <code>tsunami:1</code> is a flag, not a warning), <strong>landslides, heat, conflict</strong> — not within the three feeds' EQ scope.</li>
+  <li><strong>A magnitude-only urgent escape hatch</strong> — extreme quakes still wait for a confirmed impact signal before pushing (confirmation-only, by decision).</li>
+  <li><strong>ReliefWeb v2 <em>API</em> integration</strong> (rich querying/filters, and the <code>status</code> field needed to <em>confirm</em> a ReliefWeb retraction) until an <code>appname</code> is approved. The build runs on the <strong>RSS feed</strong> (no approval needed); the API is a drop-in behind the same normalised record once approved.</li>
+  <li><strong>Wholesale republishing of ReliefWeb report bodies</strong> (third-party copyright) — link + short excerpt + attribution only.</li>
+  <li><strong>Team / multi-recipient alerting</strong> (email, Slack/Teams). The urgent alert reaches the <strong>operator only</strong> via harness push (ADR-0007); broadcast is a noted migration path.</li>
+  <li><strong>External managed state store</strong> and a <strong>full event-sourced / append-only audit log</strong> (ADR-0003, ADR-0006 deliberately defer both).</li>
+  <li><strong>Historical backfill</strong> beyond the feeds' live windows.</li>
+  <li><strong>Auth / hosting for <code>dashboard.html</code></strong> — it is a committed static artifact.</li>
+  <li><strong>An always-on host + system cron</strong> (ADR-0005 defers; natural migration target).</li>
+</ul>
+
+<h2>Further Notes</h2>
+<ul>
+  <li><strong>Course context.</strong> This is Day-1 (<em>Plan</em>) output of a 3-day course (Plan / Autonomy / Trust). Expected artefacts by Wednesday: <code>prd.html</code>, <code>system-view.html</code>, <code>implementation-notes.md</code>, <code>dashboard.html</code>, <code>goal.md</code>, and ≥1 skill. The vertical slices cut from this PRD are filed separately as <code>slice</code> issues.</li>
+  <li><strong>ADR refinements captured here</strong> (log in <code>implementation-notes.md</code> too — an undocumented deviation is a bug): the <strong>hybrid split</strong> refines ADR-0005 (two schedulers, not one); the <strong>single-writer ledger + rebase-retry</strong> refines ADR-0006 (its "serialised by the schedule → no contention" no longer holds across two platforms); and the Actions brief needs <strong>one secret</strong>, softening the "no-secrets" framing of ADR-0005/0007.</li>
+  <li><strong>Budgets &amp; politeness.</strong> ReliefWeb ≤1000 calls/day; USGS 60s cache + gzip + <code>If-Modified-Since</code>; GDACS delta-poll on <code>datemodified</code>; ~30-min fast tick to keep the per-invocation agent cost sane (ADR-0005).</li>
+  <li><strong>Licensing/attribution.</strong> USGS public domain; GDACS attribution ("GDACS", CAP feed CC BY 4.0); ReliefWeb bodies third-party copyright + an AI-content clause — excerpt + link + attribution only.</li>
+  <li><strong>Reproducibility &amp; trust.</strong> Same fixtures → same ledger (ADR-0001); LLM fuzzy links are recorded and overridable (ADR-0004); state and readable published snapshots are committed to the repo (ADR-0006).</li>
+  <li><strong>Known feed gotchas</strong> feed straight into the fixtures: mutable events (~72h USGS revision window), <code>alertlevel</code> (event max) vs <code>episodealertlevel</code> (latest), the ~4-day GDACS window, and ReliefWeb <code>alert</code> records that can vanish entirely.</li>
+</ul>
+
+<footer class="doc">
+  PRD · HADR earthquake monitor · step B of build-plan-product · resolves CONTEXT.md Q1–Q5 against ADR-0001–0008 ·
+  <a href="https://github.com/wqisheng29/hadr-starter/issues/3">issue #3</a>
+</footer>
+
+</div>
+
+<script>
+  // Respect a ?theme= override for quick preview; otherwise follow the OS.
+  (function () {
+    try {
+      var t = new URLSearchParams(location.search).get('theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  })();
+</script>
+</body>
+</html>
