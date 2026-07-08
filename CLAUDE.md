@@ -2,10 +2,12 @@
 
 ## Language & tooling
 
-Python 3.11+ for the deterministic core. Slice-1 deps (pinned in
-`requirements.txt`): `httpx` (HTTP), `Jinja2` (render `dashboard.html`),
-`pytest` (tests). `sqlite3` is stdlib. `feedparser` (RSS) and `shapely`/haversine
-(spatiotemporal matching) arrive in later slices — not installed yet.
+Python 3.11+ for the deterministic core (see docs/adr/0008-stack-python.md).
+Slice-1 deps (pinned in `requirements.txt`): `httpx` (HTTP), `Jinja2` (render
+`dashboard.html`), `pytest` (tests). `sqlite3` is stdlib. `feedparser` (RSS) and
+`shapely`/haversine (spatiotemporal matching) arrive in later slices — not
+installed yet. The LLM/agent layer is confined to impact assessment and briefing
+prose (see docs/adr/0001-hybrid-runtime.md).
 
 Setup: `python3.12 -m venv .venv && . .venv/bin/activate && pip install -r
 requirements.txt && pip install -e .`
