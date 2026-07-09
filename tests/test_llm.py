@@ -58,6 +58,31 @@ def test_unexpected_shape_maps_to_error():
     assert not result.ok and "unexpected response shape" in result.error
 
 
+def test_empty_reply_truncated_by_reasoning_is_an_error():
+    # Verified live against glm-5.2: a reasoning model can spend the whole
+    # max_tokens budget on reasoning_content and return 200 with content "".
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{
+            "message": {"content": "", "reasoning_content": "thinking..."},
+            "finish_reason": "length",
+        }]})
+
+    result = _model(handler).complete([{"role": "user", "content": "x"}], max_tokens=32)
+    assert not result.ok and "max_tokens" in result.error
+
+
+def test_empty_reply_without_truncation_is_still_ok():
+    # An empty string the model chose to return (finish_reason=stop) is a valid
+    # answer — only length-truncation makes emptiness a failure.
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{
+            "message": {"content": ""}, "finish_reason": "stop",
+        }]})
+
+    result = _model(handler).complete([{"role": "user", "content": "x"}])
+    assert result.ok and result.text == ""
+
+
 def test_list_models_reads_data_ids_and_degrades():
     def ok(request):
         return httpx.Response(200, json={"data": [{"id": "glm-5.2"}, {"id": "kimi-k2.7-code"}]})

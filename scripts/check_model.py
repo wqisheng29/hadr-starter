@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("models:   (could not list — continuing to the test call anyway)")
 
-    result = model.complete([{"role": "user", "content": args.prompt}], max_tokens=32)
+    result = model.complete([{"role": "user", "content": args.prompt}])
     if result.ok:
         print(f"✓ reply:  {result.text!r}")
         return 0

@@ -42,8 +42,16 @@ class ChatResult:
     error: str | None = None
 
 
+# Default token budget. Reasoning models (glm-5.2 spends ~750 tokens of hidden
+# reasoning before a one-word answer) need headroom, or they truncate to an
+# empty reply.
+DEFAULT_MAX_TOKENS = 2048
+
+
 class ChatModel(Protocol):
-    def complete(self, messages: list[dict], *, max_tokens: int = 512) -> ChatResult:
+    def complete(
+        self, messages: list[dict], *, max_tokens: int = DEFAULT_MAX_TOKENS
+    ) -> ChatResult:
         ...
 
 
@@ -70,7 +78,9 @@ class OpenCodeChatModel:
     def model(self) -> str:
         return self._model
 
-    def complete(self, messages: list[dict], *, max_tokens: int = 512) -> ChatResult:
+    def complete(
+        self, messages: list[dict], *, max_tokens: int = DEFAULT_MAX_TOKENS
+    ) -> ChatResult:
         payload = {"model": self._model, "messages": messages, "max_tokens": max_tokens}
         try:
             resp = self._client.post(
@@ -83,9 +93,20 @@ class OpenCodeChatModel:
             return ChatResult(ok=False, error=f"HTTP {resp.status_code}: {resp.text[:200]}")
 
         try:
-            content = resp.json()["choices"][0]["message"]["content"]
+            choice = resp.json()["choices"][0]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             return ChatResult(ok=False, error=f"unexpected response shape: {exc}")
+
+        # Reasoning models (e.g. glm-5.2) burn max_tokens on hidden reasoning
+        # before emitting content; a too-small budget yields HTTP 200 with an
+        # empty reply. That is a failure, not an answer.
+        if not content and choice.get("finish_reason") == "length":
+            return ChatResult(
+                ok=False,
+                error="empty reply: max_tokens exhausted by reasoning before any "
+                "content (finish_reason=length) — raise max_tokens",
+            )
 
         return ChatResult(ok=True, text=content)
 

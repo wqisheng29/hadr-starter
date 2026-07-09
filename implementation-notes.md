@@ -39,6 +39,14 @@ Kept by the agent, reviewed by you. One entry per working block.
 - **No caller yet.** This is only the provider seam + a `scripts/check_model.py`
   smoke test to verify the key. Wiring it into impact assessment / briefing prose
   is Slice 6 (ADR-0001) and is deliberately not done here.
+- **Reasoning-model truncation (verified live, 9 Jul 2026).** `glm-5.2` spends
+  its budget on hidden `reasoning_content` first — ~760 completion tokens for a
+  one-word answer. Too-small `max_tokens` yields HTTP 200 with `content: ""` and
+  `finish_reason: "length"`; the client maps that to `ChatResult(ok=False)`
+  instead of treating it as an answer. Default budget is 2048
+  (`llm.DEFAULT_MAX_TOKENS`). The gateway also honors
+  `"thinking": {"type": "disabled"}` (verified: cuts the same call to ~106
+  tokens) — not exposed in the client yet; add it if Slice 6 cost matters.
 
 ## Open questions
 
