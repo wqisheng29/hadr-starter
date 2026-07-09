@@ -135,6 +135,24 @@
   }
   .chip small { font-weight: 500; color: var(--ink-soft); font-size: .8rem; }
 
+  /* ---- Executive summary ---- */
+  .exec-wrap { padding: 8px 0 0; }
+  .exec {
+    background: var(--bg-card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 30px 34px;
+  }
+  .exec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .exec-badge {
+    font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft); padding: 5px 12px; border-radius: 999px;
+  }
+  .exec-updated { font-size: .8rem; color: var(--ink-soft); }
+  .exec-lede { font-size: 1.12rem; line-height: 1.55; margin: 0 0 22px; max-width: 72ch; }
+  .exec-points { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; border-top: 1px solid var(--line); padding-top: 20px; }
+  @media (max-width: 720px) { .exec-points { grid-template-columns: 1fr; gap: 18px; } }
+  .ep-k { display: block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent-2); margin-bottom: 5px; }
+  .ep p { margin: 0; color: var(--ink-soft); font-size: .95rem; line-height: 1.5; }
+
   /* ---- Sections ---- */
   section { padding: 68px 0; }
   .section-head { max-width: 60ch; margin-bottom: 42px; }
@@ -190,6 +208,16 @@
   .tag.up { background: var(--accent); color: #fff; }
   .tag.down { background: var(--amber); color: #fff; }
   .tag.retract { background: var(--ink-soft); color: var(--bg); }
+  .tag.prov { background: var(--amber); color: #fff; }
+  .tag.conf { background: var(--accent-2); color: #fff; }
+
+  /* lifecycle mock */
+  .lc-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .lc-mag { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .lc-place { flex: 1; }
+  .lc-arrow { text-align: center; font-size: .74rem; color: var(--ink-soft); padding: 8px 0; letter-spacing: .02em; }
+  .lc-fold { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); margin: 16px 0 6px; }
+  .lc-routine { font-size: .86rem; color: var(--ink-soft); }
 
   /* ---- How it works ---- */
   .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
@@ -305,6 +333,39 @@
   </div>
 </header>
 
+<!-- EXECUTIVE SUMMARY -->
+<section id="summary" class="exec-wrap">
+  <div class="wrap">
+    <div class="exec">
+      <div class="exec-head">
+        <span class="exec-badge">Executive summary</span>
+        <span class="exec-updated">HADR Monitor — at a glance</span>
+      </div>
+      <p class="exec-lede">
+        In the first hours of a disaster the bottleneck is never effort — it's <strong>information</strong>:
+        scattered across feeds, arriving faster than anyone can read, and thick with duplicates and false
+        alarms. HADR Monitor is an unattended agent that reconciles USGS, GDACS and ReliefWeb into
+        <strong>one decision-ready picture</strong> and briefs your team every morning at 08:30 — leading
+        with what changed since yesterday, including anything it previously reported that is no longer true.
+      </p>
+      <div class="exec-points">
+        <div class="ep">
+          <span class="ep-k">What it does</span>
+          <p>Watches three authoritative feeds around the clock, collapses the same event across them into one canonical record, and filters out routine noise.</p>
+        </div>
+        <div class="ep">
+          <span class="ep-k">What you get</span>
+          <p>A self-correcting 08:30 situation report — plus an immediate push for severe, confirmed events, and silence when nothing has changed.</p>
+        </div>
+        <div class="ep">
+          <span class="ep-k">Why it's trusted</span>
+          <p>A deterministic core: the same inputs always yield the same result, so every reconciliation and alert is testable and defensible.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- FEATURES -->
 <section id="features">
   <div class="wrap">
@@ -344,6 +405,49 @@
         <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></div>
         <h3>Reproducible &amp; auditable</h3>
         <p>A deterministic core means the same inputs always yield the same result — every reconciliation is testable, traceable and defensible when the stakes are high.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIFECYCLE: provisional -> confirmed -->
+<section id="lifecycle" class="signature">
+  <div class="wrap split">
+    <div>
+      <p class="kicker">Provisional → confirmed</p>
+      <h2>Never mistake an early read for a settled one.</h2>
+      <p style="color:var(--ink-soft); font-size:1.05rem; margin:0;">
+        The first minutes of a quake are the fastest information you'll get — and the least certain.
+        Magnitude and location land before any impact signal does. HADR Monitor labels every event
+        <strong>provisional</strong> on first detection and firms it to <strong>confirmed</strong> the
+        moment the data settles — a reviewed USGS status, a PAGER alert, or a GDACS ShakeMap. Your team
+        sees at a glance exactly how much to trust each line.
+      </p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Status on every event.</strong> An early, automatic read is never dressed up as settled fact.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Headline vs. below the fold.</strong> Material events lead; routine and ongoing ones fold into a tidy summary so the top of the brief stays clean.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Sticky.</strong> Once an event is confirmed it never quietly slips back to provisional.</span></li>
+      </ul>
+    </div>
+
+    <div class="mock" role="img" aria-label="Example dashboard showing an event firming from provisional to confirmed, with routine events below the fold">
+      <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><span class="title">dashboard.html — headline events</span></div>
+      <div class="mock-body">
+        <p class="h">Headline events</p>
+        <p class="as-of">Status firms up as the data lands</p>
+        <div class="lc-row">
+          <span class="lc-mag">M6.8</span>
+          <span class="lc-place">SW of Padang, Indonesia</span>
+          <span class="tag prov">provisional</span>
+        </div>
+        <div class="lc-arrow">▼ &nbsp;PAGER Orange lands · ShakeMap settles</div>
+        <div class="lc-row">
+          <span class="lc-mag">M6.8</span>
+          <span class="lc-place">SW of Padang, Indonesia</span>
+          <span class="tag conf">confirmed</span>
+        </div>
+        <p class="lc-fold">Routine / ongoing · below the fold</p>
+        <div class="lc-routine"><span class="lc-mag">M4.6</span> 40 km E of Nikolski, Alaska <span class="tag prov">provisional</span></div>
       </div>
     </div>
   </div>
@@ -442,7 +546,7 @@
         <li>
           <span class="now">Today</span>
           <strong>Earthquakes, end to end</strong>
-          <p>USGS, GDACS and ReliefWeb fully reconciled for seismic events — the proving ground for the pipeline.</p>
+          <p>USGS and GDACS reconciled into one canonical event, with a provisional→confirmed lifecycle on every quake — the proving ground for the pipeline.</p>
         </li>
         <li>
           <span class="now next">Next</span>
@@ -452,7 +556,7 @@
         <li>
           <span class="now next">Next</span>
           <strong>Deeper impact assessment</strong>
-          <p>From a fast provisional read toward confirmed, population-aware severity as PAGER and impact scoring land.</p>
+          <p>Beyond today's lifecycle, toward population-aware severity — PAGER loss bins and exposure counts on every confirmed event.</p>
         </li>
         <li>
           <span class="now next">Ahead</span>
