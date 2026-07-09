@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HADR Monitor — Situational awareness in the first hours of a disaster</title>
+<meta name="description" content="An unattended agent that watches authoritative disaster feeds around the clock, cuts the noise, and delivers a decision-ready situation report every morning — including what changed since yesterday.">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f7f6f3;
+    --bg-card: #ffffff;
+    --ink: #16150f;
+    --ink-soft: #57544c;
+    --line: #e6e3dc;
+    --accent: #b30000;
+    --accent-soft: #fbe7e7;
+    --accent-2: #0b5d52;
+    --accent-2-soft: #e4f2ef;
+    --amber: #b26a00;
+    --amber-soft: #fcefda;
+    --shadow: 0 1px 2px rgba(20,18,10,.05), 0 8px 24px rgba(20,18,10,.06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131311;
+      --bg-soft: #1a1a17;
+      --bg-card: #1d1d19;
+      --ink: #f3f1ea;
+      --ink-soft: #a8a49a;
+      --line: #2e2d28;
+      --accent: #ff6b6b;
+      --accent-soft: #341717;
+      --accent-2: #4fd1bd;
+      --accent-2-soft: #12241f;
+      --amber: #e0a955;
+      --amber-soft: #2a2110;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131311; --bg-soft: #1a1a17; --bg-card: #1d1d19; --ink: #f3f1ea;
+    --ink-soft: #a8a49a; --line: #2e2d28; --accent: #ff6b6b; --accent-soft: #341717;
+    --accent-2: #4fd1bd; --accent-2-soft: #12241f; --amber: #e0a955; --amber-soft: #2a2110;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --bg-soft: #f7f6f3; --bg-card: #ffffff; --ink: #16150f;
+    --ink-soft: #57544c; --line: #e6e3dc; --accent: #b30000; --accent-soft: #fbe7e7;
+    --accent-2: #0b5d52; --accent-2-soft: #e4f2ef; --amber: #b26a00; --amber-soft: #fcefda;
+    --shadow: 0 1px 2px rgba(20,18,10,.05), 0 8px 24px rgba(20,18,10,.06);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+
+  /* ---- Nav ---- */
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: saturate(180%) blur(12px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.01em; }
+  .brand .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: .7; } }
+  @media (prefers-reduced-motion: reduce) {
+    .brand .dot { animation: none; }
+  }
+  .nav-links { display: flex; gap: 26px; align-items: center; font-size: .93rem; }
+  .nav-links a { text-decoration: none; color: var(--ink-soft); }
+  .nav-links a:hover { color: var(--ink); }
+  .btn {
+    display: inline-block; text-decoration: none; font-weight: 600;
+    padding: 11px 20px; border-radius: 10px; font-size: .95rem;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--shadow); }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-ghost { border: 1px solid var(--line); color: var(--ink); background: var(--bg-card); }
+  .btn-ghost:hover { border-color: var(--ink-soft); }
+  .nav-links .btn { padding: 8px 16px; }
+  @media (max-width: 680px) { .nav-links a:not(.btn) { display: none; } }
+
+  /* ---- Hero ---- */
+  header.hero { padding: 76px 0 56px; position: relative; overflow: hidden; }
+  .hero-grid {
+    position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background-image: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0);
+    background-size: 28px 28px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+            mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: .8rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--accent-2); background: var(--accent-2-soft);
+    padding: 6px 12px; border-radius: 999px; margin-bottom: 22px;
+  }
+  h1 {
+    font-size: clamp(2.1rem, 5.2vw, 3.6rem); line-height: 1.06; letter-spacing: -.025em;
+    margin: 0 0 20px; max-width: 16ch; font-weight: 800;
+  }
+  h1 .hl { color: var(--accent); }
+  .lede { font-size: clamp(1.05rem, 2.2vw, 1.28rem); color: var(--ink-soft); max-width: 56ch; margin: 0 0 32px; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .cta-note { font-size: .88rem; color: var(--ink-soft); }
+  .hero-content { position: relative; z-index: 1; }
+
+  /* ---- Trust strip ---- */
+  .feeds { margin-top: 54px; }
+  .feeds-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 16px; }
+  .feed-chips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px;
+    background: var(--bg-card); font-weight: 600; font-size: .95rem;
+  }
+  .chip small { font-weight: 500; color: var(--ink-soft); font-size: .8rem; }
+
+  /* ---- Sections ---- */
+  section { padding: 68px 0; }
+  .section-head { max-width: 60ch; margin-bottom: 42px; }
+  .kicker { font-size: .82rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h2 { font-size: clamp(1.6rem, 3.4vw, 2.35rem); letter-spacing: -.02em; margin: 0 0 14px; line-height: 1.15; }
+  .section-head p { font-size: 1.08rem; color: var(--ink-soft); margin: 0; }
+
+  /* ---- Feature grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px 24px; box-shadow: var(--shadow);
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .icon {
+    width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent); margin-bottom: 16px;
+  }
+  .icon svg { width: 22px; height: 22px; }
+  .card h3 { margin: 0 0 8px; font-size: 1.12rem; letter-spacing: -.01em; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: .96rem; }
+
+  /* ---- Signature / self-correcting ---- */
+  .signature { background: var(--bg-soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 820px) { .split { grid-template-columns: 1fr; gap: 32px; } }
+  .split ul { list-style: none; padding: 0; margin: 20px 0 0; }
+  .split li { display: flex; gap: 12px; padding: 9px 0; font-size: 1rem; }
+  .split li svg { flex: none; width: 22px; height: 22px; color: var(--accent-2); margin-top: 2px; }
+
+  /* mock briefing */
+  .mock {
+    background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden; font-size: .9rem;
+  }
+  .mock-bar { display: flex; align-items: center; gap: 7px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--bg-soft); }
+  .mock-bar .tl { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+  .mock-bar .title { margin-left: 8px; font-size: .8rem; color: var(--ink-soft); font-weight: 600; }
+  .mock-body { padding: 18px 18px 22px; }
+  .mock-body .h { font-weight: 700; font-size: 1rem; margin: 0 0 3px; }
+  .mock-body .as-of { color: var(--ink-soft); font-size: .8rem; margin: 0 0 14px; }
+  .change {
+    border-left: 3px solid; padding: 9px 12px; border-radius: 0 8px 8px 0; margin-bottom: 10px; font-size: .88rem;
+  }
+  .change.up { border-color: var(--accent); background: var(--accent-soft); }
+  .change.down { border-color: var(--amber); background: var(--amber-soft); }
+  .change.retract { border-color: var(--ink-soft); background: var(--bg-soft); }
+  .change b { display: block; margin-bottom: 1px; }
+  .tag { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 5px; vertical-align: middle; }
+  .tag.up { background: var(--accent); color: #fff; }
+  .tag.down { background: var(--amber); color: #fff; }
+  .tag.retract { background: var(--ink-soft); color: var(--bg); }
+
+  /* ---- How it works ---- */
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  @media (max-width: 820px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 460px) { .steps { grid-template-columns: 1fr; } }
+  .step { position: relative; padding: 24px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-card); }
+  .step .n { font-size: .78rem; font-weight: 800; color: var(--accent); letter-spacing: .05em; }
+  .step h3 { margin: 8px 0 6px; font-size: 1.05rem; }
+  .step p { margin: 0; color: var(--ink-soft); font-size: .92rem; }
+
+  /* ---- Honesty callout ---- */
+  .honest {
+    display: flex; gap: 20px; align-items: flex-start;
+    background: var(--accent-2-soft); border: 1px solid color-mix(in srgb, var(--accent-2) 30%, var(--line));
+    border-radius: var(--radius); padding: 30px 28px;
+  }
+  .honest .ic { flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--accent-2); color: #fff; display: grid; place-items: center; }
+  .honest h3 { margin: 0 0 8px; font-size: 1.2rem; }
+  .honest p { margin: 0; color: var(--ink-soft); }
+
+  /* ---- Stats ---- */
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 20px; text-align: center; }
+  @media (max-width: 640px) { .stats { grid-template-columns: repeat(2,1fr); } }
+  .stat .big { font-size: clamp(1.9rem, 4vw, 2.8rem); font-weight: 800; letter-spacing: -.03em; color: var(--accent); line-height: 1; }
+  .stat .lbl { margin-top: 8px; color: var(--ink-soft); font-size: .92rem; }
+
+  /* ---- Final CTA ---- */
+  .final {
+    text-align: center; background: var(--ink); color: var(--bg);
+    border-radius: 22px; padding: 60px 32px; box-shadow: var(--shadow);
+  }
+  .final h2 { color: var(--bg); }
+  .final p { color: color-mix(in srgb, var(--bg) 72%, var(--ink)); max-width: 52ch; margin: 0 auto 28px; font-size: 1.08rem; }
+  .final .btn-primary { background: var(--accent); }
+  .final .btn-ghost { background: transparent; border-color: color-mix(in srgb, var(--bg) 40%, var(--ink)); color: var(--bg); }
+
+  /* ---- Footer ---- */
+  footer { border-top: 1px solid var(--line); padding: 34px 0; color: var(--ink-soft); font-size: .88rem; }
+  .foot-inner { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <div class="brand"><span class="dot"></span> HADR&nbsp;Monitor</div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#signature">Self-correcting</a>
+      <a href="#how">How it works</a>
+      <a class="btn btn-primary" href="#start">Get started</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-grid"></div>
+  <div class="wrap hero-content">
+    <span class="eyebrow">● Live disaster intelligence</span>
+    <h1>Know <span class="hl">what happened, where, and how bad</span> — before anyone's awake.</h1>
+    <p class="lede">
+      In the first hours of a disaster, the hardest problem is information. HADR Monitor watches
+      the authoritative feeds around the clock, filters out the noise, and hands your team one
+      decision-ready situation report every morning — so scarce responders and supplies go where they matter.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#start">See a live briefing</a>
+      <a class="btn btn-ghost" href="#how">How it works</a>
+      <span class="cta-note">Runs unattended · Stays silent when nothing changed</span>
+    </div>
+
+    <div class="feeds">
+      <div class="feeds-label">Reconciles three authoritative sources</div>
+      <div class="feed-chips">
+        <span class="chip">USGS <small>detection · minutes</small></span>
+        <span class="chip">GDACS <small>impact triage · multi-hazard</small></span>
+        <span class="chip">ReliefWeb <small>confirmation · context</small></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">Why teams rely on it</p>
+      <h2>From a firehose of feeds to a picture you can act on.</h2>
+      <p>Disaster information is scattered, arrives faster than any human can read, and is full of duplicates and false alarms. HADR Monitor turns it into shared situational awareness — automatically.</p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Detect early, day or night</h3>
+        <p>Continuously watches GDACS, USGS and ReliefWeb so a significant event is noticed within minutes — no human on watch required.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg></div>
+        <h3>Cut through the noise</h3>
+        <p>Filters out minor tremors, routine updates and false alarms, and de-duplicates the same event arriving from several feeds under different identifiers.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 3.4a2 2 0 0 1 0 2.8l-9.9 9.9-4.2 1.4 1.4-4.2 9.9-9.9a2 2 0 0 1 2.8 0z"/></svg></div>
+        <h3>Assess real impact</h3>
+        <p>For every event that survives the filter it characterises severity by impact signals — who's affected, not just raw magnitude — with a provisional read that firms up as data lands.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.2L4 17.5z"/><path d="M8 9h8M8 12h5"/></svg></div>
+        <h3>Brief decision-makers</h3>
+        <p>Publishes a concise morning situation report at 08:30 local time, so coordinators start the day with a shared, current picture — no dashboards to babysit.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6z"/><path d="M9.5 12l1.8 1.8 3.4-3.6"/></svg></div>
+        <h3>Urgent alerts that break the silence</h3>
+        <p>When a severe, high-confidence event appears, it pushes an alert immediately — well before the morning brief. You only get interrupted when it truly matters.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></div>
+        <h3>Reproducible &amp; auditable</h3>
+        <p>A deterministic core means the same inputs always yield the same result — every reconciliation is testable, traceable and defensible when the stakes are high.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SIGNATURE FEATURE -->
+<section id="signature" class="signature">
+  <div class="wrap split">
+    <div>
+      <p class="kicker">The feature no one else has</p>
+      <h2>It tells you what changed — including what it got wrong.</h2>
+      <p style="color:var(--ink-soft); font-size:1.05rem; margin:0;">
+        Disaster feeds are living databases: magnitudes get revised, locations shift, events are retracted.
+        Almost every other tool reports once and never looks back. HADR Monitor's briefing leads with
+        <strong>what changed since the last brief</strong> — upgrades, downgrades, and honest retractions of
+        anything it previously told you.
+      </p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Self-correcting.</strong> Yesterday's picture is reconciled against today's data, so your team never acts on stale numbers.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Builds trust.</strong> Corrections are phrased plainly, not buried — the report earns confidence by owning its revisions.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Change-first.</strong> You read the delta, not the whole world, every morning — seconds to orient, not minutes.</span></li>
+      </ul>
+    </div>
+
+    <div class="mock" role="img" aria-label="Example morning briefing highlighting changes since the last report">
+      <div class="mock-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><span class="title">dashboard.html — 08:30 SGT</span></div>
+      <div class="mock-body">
+        <p class="h">Morning situation report</p>
+        <p class="as-of">Changes since yesterday's brief</p>
+        <div class="change up"><span class="tag up">Upgraded</span> <b style="margin-top:6px">M6.8 — SW of Padang, Indonesia</b>Revised up from M6.4. PAGER now Orange — significant population exposure.</div>
+        <div class="change down"><span class="tag down">Downgraded</span> <b style="margin-top:6px">Cyclone off Luzon</b>Impact score lowered as it tracks out to sea; no longer expected to require international assistance.</div>
+        <div class="change retract"><span class="tag retract">Retracted</span> <b style="margin-top:6px">M5.1 — E of Hualien, Taiwan</b>Previously reported yesterday; USGS has since removed this event. Disregard.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">How it works</p>
+      <h2>Four moving parts. Zero babysitting.</h2>
+      <p>A fast loop keeps a reconciled picture current; the morning tick turns it into prose your responders can read in a minute.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">01 · WATCH</div><h3>Poll the feeds</h3><p>Every ~30 minutes it fetches GDACS, USGS and ReliefWeb — efficiently, within each source's rate budget.</p></div>
+      <div class="step"><div class="n">02 · RECONCILE</div><h3>Merge into one truth</h3><p>The deterministic core matches events across feeds and keeps a single canonical record per real-world event.</p></div>
+      <div class="step"><div class="n">03 · ASSESS</div><h3>Judge severity</h3><p>Impact is scored; severe, high-confidence events trigger an immediate push instead of waiting.</p></div>
+      <div class="step"><div class="n">04 · BRIEF</div><h3>Publish at 08:30</h3><p>It diffs against yesterday and writes a self-correcting report to <code>dashboard.html</code> — then goes quiet.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HONESTY -->
+<section style="padding-top:0;">
+  <div class="wrap">
+    <div class="honest">
+      <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg></div>
+      <div>
+        <h3>Honest about what it can't see</h3>
+        <p>Good situational awareness knows its own limits. Every briefing states its coverage blind spots plainly — so your team can trust what it reads and knows exactly where to look elsewhere. No false confidence, ever.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="signature" style="padding:56px 0;">
+  <div class="wrap stats">
+    <div class="stat"><div class="big">3</div><div class="lbl">authoritative feeds, reconciled into one</div></div>
+    <div class="stat"><div class="big">24/7</div><div class="lbl">unattended monitoring, no human on watch</div></div>
+    <div class="stat"><div class="big">~30<span style="font-size:1rem">min</span></div><div class="lbl">refresh loop keeping the picture current</div></div>
+    <div class="stat"><div class="big">08:30</div><div class="lbl">one decision-ready brief, every morning</div></div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="start">
+  <div class="wrap">
+    <div class="final">
+      <p class="kicker" style="color:var(--accent)">Get started</p>
+      <h2>Start every morning with the whole picture.</h2>
+      <p>Point HADR Monitor at your region, set your briefing time, and let it run. When disaster strikes, your team acts on facts — not a scramble across a dozen feeds.</p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn btn-primary" href="dashboard.html">View a sample briefing</a>
+        <a class="btn btn-ghost" href="#features">Explore the features</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div class="brand" style="font-size:.95rem"><span class="dot"></span> HADR&nbsp;Monitor</div>
+    <div>Situational awareness for humanitarian assistance &amp; disaster response.</div>
+    <div>Sources: USGS · GDACS · ReliefWeb</div>
+  </div>
+</footer>
+
+</body>
+</html>
