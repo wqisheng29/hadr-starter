@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
+from .alert import Alert
+
 
 @dataclass(frozen=True)
 class QuakeRecord:
@@ -194,3 +196,7 @@ class RunResult:
     out_path: str
     warnings: tuple[str, ...] = field(default=())
     feed_statuses: tuple[FeedStatus, ...] = field(default=())
+    # Urgent alerts fired this run (Slice 4). Empty unless a ``push_sink`` was
+    # injected AND an event was severe + confirmed + not already pushed at this
+    # level — so the fire/no-fire decision is assertable as data.
+    alerts_pushed: tuple[Alert, ...] = field(default=())

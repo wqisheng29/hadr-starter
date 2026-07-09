@@ -16,6 +16,7 @@ from pathlib import Path
 from . import config
 from .clock import Clock
 from .fetch import GDACS_SOURCE, GLIDE_SOURCE, USGS_SOURCE
+from .alert import EventFacts
 from .matcher import resolve_canonical_id, resolve_canonical_id_gdacs
 from .model import EventRow, GdacsRecord, QuakeRecord
 
@@ -43,7 +44,8 @@ CREATE TABLE IF NOT EXISTS canonical_events (
     country                 TEXT,
     usgs_status             TEXT,
     pager_alert             TEXT,
-    gdacs_is_temporary      INTEGER
+    gdacs_is_temporary      INTEGER,
+    last_pushed_level       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS feed_identifiers (
@@ -373,6 +375,50 @@ def read_events(conn: sqlite3.Connection) -> list[EventRow]:
         )
         for row in rows
     ]
+
+
+def read_event_facts(conn: sqlite3.Connection) -> list[EventFacts]:
+    """Every canonical event's facts for the urgent-alert decision (Slice 4).
+
+    Read-only: the pure ``alert.decide_alert`` consumes these; no live signal, no
+    enrichment. Ordered strongest-first (matching ``read_events``) so the order
+    pushes fire in — and thus ``RunResult.alerts_pushed`` — is deterministic."""
+    rows = conn.execute(
+        "SELECT canonical_id, status, gdacs_episodealertlevel, pager_alert, "
+        "last_pushed_level, title, magnitude, place "
+        "FROM canonical_events "
+        "ORDER BY magnitude DESC NULLS LAST, canonical_id ASC"
+    ).fetchall()
+    return [
+        EventFacts(
+            canonical_id=row["canonical_id"],
+            status=row["status"],
+            gdacs_episodealertlevel=row["gdacs_episodealertlevel"],
+            pager_alert=row["pager_alert"],
+            last_pushed_level=row["last_pushed_level"],
+            title=row["title"],
+            magnitude=row["magnitude"],
+            place=row["place"],
+        )
+        for row in rows
+    ]
+
+
+def record_pushed(
+    conn: sqlite3.Connection, canonical_id: str, level: str, clock: Clock
+) -> None:
+    """Persist the last alert level pushed for an event, so one-push-per-event
+    survives stateless ticks (a fresh ``run()`` / connection does not re-fire).
+
+    Deliberately does NOT bump ``last_updated``: a push is a delivery side effect,
+    not a change to the event's feed-derived facts, and bumping it would pollute
+    Slice 5's "changed since last brief" diff. ``clock`` is accepted for symmetry
+    with the other mutators (and a future audit column) but not written here."""
+    _ = clock  # reserved; a push does not touch last_updated (see docstring)
+    conn.execute(
+        "UPDATE canonical_events SET last_pushed_level = ? WHERE canonical_id = ?",
+        (level, canonical_id),
+    )
 
 
 def _sources_for(conn: sqlite3.Connection, canonical_id: str) -> tuple[str, ...]:

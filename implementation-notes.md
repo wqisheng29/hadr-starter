@@ -237,6 +237,32 @@ byte-unchanged):
   This governs dashboard *surfacing* only and does **not** loosen the urgent-push
   rule, which stays confirmation-only with no magnitude escape hatch (Slice 4).
 
+### Slice 4 — urgent-alert decision + push
+
+- **The decision is a pure function** (`alert.decide_alert`), importing only
+  `config`. Whether a severe, high-confidence quake breaks silence — *and the
+  words of the push* — are deterministic core, never the LLM (PRD Q2, ADR-0002/7):
+  same facts + same "as of" ⇒ same fire/no-fire + byte-identical message. The
+  message (`compose_message`) is a fixed template of ledger facts, magnitude
+  formatted `M%.1f` to match the dashboard.
+- **Severe = impact, never magnitude.** GDACS latest-episode `episodealertlevel`
+  Red (`URGENT_GDACS_LEVELS`) or USGS PAGER Orange/Red (`URGENT_PAGER_LEVELS`).
+  **High-confidence = the Slice-3 lifecycle `status` is confirmed**, so a
+  pre-ShakeMap GDACS Red (still provisional) does not fire; a strong-but-
+  unconfirmed quake never fires (no magnitude escape hatch).
+- **Escalation-only, one-push-per-event.** The event's current urgent level is the
+  max-rank qualifying signal (`URGENT_LEVEL_RANK`); it fires only when strictly
+  higher-rank than the persisted `last_pushed_level`. First severe+confirmed
+  fires; a re-run at the same level does not; Orange→Red fires again; a downgrade
+  never fires. This survives stateless ticks because `last_pushed_level` is a
+  ledger column.
+- **Delivery is an injected sink** (`push.PushSink`), like `FeedSource`/`Clock`;
+  tests inject `RecordingPushSink` and assert the decision as data. `run()` gains
+  `push_sink=None`; the push is evaluated only when a sink is supplied (the fast
+  tick), never in the `push_sink=None` brief context — matching the PRD hybrid
+  split. Fired alerts are returned in `RunResult.alerts_pushed`. No real-network
+  push here (the CLI wires no production sink yet).
+
 ## Open questions
 
 ## Deviations
@@ -244,6 +270,19 @@ byte-unchanged):
 <!-- Anything built that departs from the PRD or CLAUDE.md is recorded here,
      with the reason. An undocumented deviation is a bug. -->
 
+- **Slice 4: `last_pushed_level` is not a reconcile-tracked field.** It records the
+  alert level last pushed (one-push-per-event across stateless ticks) but is
+  excluded from `_TRACKED`/`_GDACS_TRACKED`, so it never affects reconcile
+  idempotency or `rows_written`. `record_pushed` also deliberately does NOT bump
+  `last_updated` — a push is a delivery side effect, not a change to feed-derived
+  facts, and bumping it would pollute Slice 5's "changed since last brief" diff.
+- **Slice 4: GDACS Orange is not an urgent signal** (PRD: GDACS *Red* only), so
+  the clean Orange→Red escalation runs on the PAGER axis (PAGER Orange→Red). A
+  GDACS Orange→Red sequence yields exactly one Red push (Orange never pushed).
+- **Slice 4: no production push sink is wired.** The decision + message are
+  complete and tested via `RecordingPushSink`; delivery over the harness's native
+  push is left to Slice 7's scheduled agent (real network is out of this slice's
+  scope). `scripts/run.py` runs with `push_sink=None`.
 - **Four modules, not four scripts.** ADR-0008 names `poll.py`/`match.py`/
   `ledger.py`/`brief.py` as separate scripts; slice 1's DoD wants a *single*
   command, so the four responsibilities are modules inside a `hadr/` package

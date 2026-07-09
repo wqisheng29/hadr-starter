@@ -10,11 +10,20 @@ never a crash and never a wiped ledger.
 from pathlib import Path
 
 from . import config
+from .alert import Alert, decide_alert
 from .briefer import write_dashboard
-from .clock import Clock
+from .clock import Clock, format_sgt
 from .fetch import GDACS_SOURCE, USGS_SOURCE, FeedSource, parse_gdacs, parse_usgs
-from .ledger import connect, read_events, reconcile, reconcile_gdacs
+from .ledger import (
+    connect,
+    read_event_facts,
+    read_events,
+    reconcile,
+    reconcile_gdacs,
+    record_pushed,
+)
 from .model import FeedStatus, QuakeRecord, RunResult
+from .push import PushSink
 
 
 def _qualifies(record: QuakeRecord, min_magnitude: float) -> bool:
@@ -29,11 +38,20 @@ def run(
     out_path: str | Path = config.DEFAULT_OUT_PATH,
     min_magnitude: float = config.MIN_MAGNITUDE,
     gdacs_source: FeedSource | None = None,
+    push_sink: PushSink | None = None,
 ) -> RunResult:
     """Fetch -> parse -> reconcile USGS, then optionally the same for GDACS onto
-    the same ledger, then render. Each feed degrades independently: an
+    the same ledger, then (if a ``push_sink`` is injected) evaluate the urgent-
+    alert decision and render. Each feed degrades independently: an
     unreachable/unparseable feed is noted in a banner and the dashboard still
-    renders over the last known picture."""
+    renders over the last known picture.
+
+    The urgent push is the "fast tick" (Slice 4): after both feeds reconcile and
+    the lifecycle status is refreshed, every event is run through the deterministic
+    ``decide_alert``; each fired ``Alert`` is delivered once and its level recorded
+    so a stateless re-run does not re-fire. When ``push_sink is None`` (e.g. the
+    08:30 brief context, which must not push per the PRD hybrid split) the decision
+    is not even evaluated."""
     conn = connect(db_path)
     try:
         warnings: list[str] = []
@@ -47,6 +65,8 @@ def run(
             feed_statuses.append(gdacs_status)
             rows_written += gdacs_rows
 
+        alerts_pushed = _run_push(conn, push_sink, clock) if push_sink is not None else ()
+
         events = read_events(conn)
         write_dashboard(events, clock.now(), feed_status, out_path, feed_statuses)
 
@@ -57,9 +77,28 @@ def run(
             out_path=str(out_path),
             warnings=tuple(warnings),
             feed_statuses=tuple(feed_statuses),
+            alerts_pushed=alerts_pushed,
         )
     finally:
         conn.close()
+
+
+def _run_push(conn, push_sink: PushSink, clock: Clock) -> tuple[Alert, ...]:
+    """Evaluate the urgent-alert decision over every event and deliver each fired
+    alert exactly once. Pure decision (``decide_alert``) + one side effect per fire
+    (``push_sink.send`` + ``record_pushed``). The message's "as of" comes from the
+    injected clock, so the whole thing is reproducible under a frozen clock."""
+    as_of = format_sgt(clock.now())
+    fired: list[Alert] = []
+    for facts in read_event_facts(conn):
+        alert = decide_alert(facts, as_of)
+        if alert is None:
+            continue
+        push_sink.send(alert)
+        record_pushed(conn, alert.canonical_id, alert.level, clock)
+        fired.append(alert)
+    conn.commit()
+    return tuple(fired)
 
 
 def _run_usgs(conn, source, clock, min_magnitude, warnings) -> tuple[FeedStatus, int]:

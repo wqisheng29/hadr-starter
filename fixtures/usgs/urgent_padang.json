@@ -1,0 +1,28 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1783342886000,
+    "title": "USGS All Earthquakes, Past Day",
+    "count": 1
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 6.8,
+        "place": "120 km SW of Padang, Indonesia",
+        "time": 1783300000000,
+        "updated": 1783300600000,
+        "alert": "orange",
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 711,
+        "ids": ",us7000abcd,at00abcd,",
+        "type": "earthquake",
+        "title": "M 6.8 - 120 km SW of Padang, Indonesia"
+      },
+      "geometry": { "type": "Point", "coordinates": [99.6, -1.4, 30.0] },
+      "id": "us7000abcd"
+    }
+  ]
+}
