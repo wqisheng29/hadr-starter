@@ -148,29 +148,47 @@ def reconcile_gdacs(
     true no-op.
     """
     now = clock.now().isoformat()
-    changed = 0
+
+    # Pass 1 — resolve, ensure a row exists, link, and group. Several GDACS records
+    # can collapse onto one canonical event (an aftershock sequence sharing a GLIDE,
+    # or two episodes of one eventid in the same payload). Writing per-record would
+    # let them overwrite each other's columns and re-fire the UPDATE on every
+    # re-run (last_updated churn under a real clock); instead each group folds to a
+    # single deterministic target and is written once in pass 2, so a plain re-run
+    # is a true no-op. A newly-minted GDACS-only event gets a base row inserted here
+    # (from the first record that mints it) so identifier links satisfy the FK and a
+    # later record in the payload can find it by GLIDE; its GDACS columns are filled
+    # by the fold in pass 2.
+    groups: dict[str, list[GdacsRecord]] = {}
+    created: set[str] = set()
     for record in records:
         canonical_id = resolve_canonical_id_gdacs(conn, record)
-        existing = conn.execute(
-            "SELECT * FROM canonical_events WHERE canonical_id = ?", (canonical_id,)
-        ).fetchone()
-        target = _gdacs_target_fields(record, existing)
-
-        if existing is None:
+        first_in_payload = canonical_id not in groups
+        groups.setdefault(canonical_id, []).append(record)
+        if first_in_payload and conn.execute(
+            "SELECT 1 FROM canonical_events WHERE canonical_id = ?", (canonical_id,)
+        ).fetchone() is None:
             conn.execute(
                 "INSERT INTO canonical_events "
                 "(canonical_id, hazard_type, status, first_seen, last_updated, "
-                " magnitude, depth_km, place, title, origin_time, longitude, latitude, "
-                f" {', '.join(_GDACS_TRACKED)}) "
-                "VALUES (?, ?, 'provisional', ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-                f"{', '.join('?' for _ in _GDACS_TRACKED)})",
+                " magnitude, depth_km, place, title, origin_time, longitude, latitude) "
+                "VALUES (?, ?, 'provisional', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (canonical_id, _hazard_type(record.eventtype), now, now,
                  record.magnitude, record.depth_km, record.name, record.name,
-                 _iso(record.origin_time_ms), record.longitude, record.latitude,
-                 *(target[f] for f in _GDACS_TRACKED)),
+                 _iso(record.origin_time_ms), record.longitude, record.latitude),
             )
-            changed += 1
-        elif any(existing[f] != target[f] for f in _GDACS_TRACKED):
+            created.add(canonical_id)
+        _link_gdacs_ids(conn, record, canonical_id)
+
+    # Pass 2 — fold each group's GDACS columns and write once.
+    changed = 0
+    for canonical_id, group in groups.items():
+        row = conn.execute(
+            "SELECT * FROM canonical_events WHERE canonical_id = ?", (canonical_id,)
+        ).fetchone()
+        prior = None if canonical_id in created else row
+        target = _gdacs_target_fields(group, prior)
+        if canonical_id in created or any(row[f] != target[f] for f in _GDACS_TRACKED):
             conn.execute(
                 f"UPDATE canonical_events SET last_updated = ?, "
                 f"{', '.join(f'{f} = ?' for f in _GDACS_TRACKED)} WHERE canonical_id = ?",
@@ -178,8 +196,6 @@ def reconcile_gdacs(
             )
             changed += 1
         # else: identical GDACS columns -> no write (keeps re-runs idempotent).
-
-        _link_gdacs_ids(conn, record, canonical_id)
 
     conn.commit()
     return changed
@@ -189,23 +205,41 @@ def _hazard_type(eventtype: str) -> str:
     return _HAZARD_BY_EVENTTYPE.get(eventtype, eventtype.lower())
 
 
-def _gdacs_target_fields(record: GdacsRecord, existing) -> dict[str, object]:
-    """Compute the target GDACS columns, folding in the existing row.
+def _latest_gdacs(group: list[GdacsRecord]) -> GdacsRecord:
+    """The latest record in a group, chosen deterministically (independent of
+    payload order): newest origin time, then episodeid, then eventid. Its
+    episode-level fields (eventid, episodeid, episodealertlevel) become the
+    event's current values."""
+    return max(group, key=lambda r: (r.origin_time_ms, r.episodeid, r.eventid))
 
-    ``gdacs_alertlevel`` is monotonic (event-MAX severity ever seen);
-    ``gdacs_episodealertlevel`` is always the latest. ``glide``/``country`` keep
-    a prior non-null value when the incoming record omits it.
+
+def _gdacs_target_fields(group: list[GdacsRecord], existing) -> dict[str, object]:
+    """Fold a group of GDACS records (all resolving to one canonical event) plus
+    the existing row into the target GDACS columns.
+
+    ``gdacs_alertlevel`` is monotonic (event-MAX severity ever seen across the
+    whole group and the prior row); ``gdacs_episodealertlevel``/``eventid``/
+    ``episodeid`` come from the latest episode in the group;
+    ``glide``/``country`` keep a prior non-null value when none is supplied.
+    Order-independent, so a re-run of the same payload is a true no-op.
     """
     def prev(col: str):
         return existing[col] if existing is not None else None
 
+    latest = _latest_gdacs(group)
+    alert_max = prev("gdacs_alertlevel")
+    for record in group:
+        alert_max = _alert_max(alert_max, record.alertlevel)
+    glide = next((r.glide for r in group if r.glide), None) or prev("glide")
+    country = next((r.country for r in group if r.country is not None), prev("country"))
+
     return {
-        "gdacs_eventid": record.eventid,
-        "gdacs_episodeid": record.episodeid or prev("gdacs_episodeid"),
-        "gdacs_alertlevel": _alert_max(prev("gdacs_alertlevel"), record.alertlevel),
-        "gdacs_episodealertlevel": record.episodealertlevel,
-        "glide": (record.glide or None) or prev("glide"),
-        "country": record.country if record.country is not None else prev("country"),
+        "gdacs_eventid": latest.eventid,
+        "gdacs_episodeid": latest.episodeid or prev("gdacs_episodeid"),
+        "gdacs_alertlevel": alert_max,
+        "gdacs_episodealertlevel": latest.episodealertlevel,
+        "glide": glide,
+        "country": country,
     }
 
 

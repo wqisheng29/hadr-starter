@@ -243,13 +243,30 @@ byte-unchanged):
   untrusted feed/model text). Verified: `<script>` in a `place` is now escaped;
   the committed `dashboard.html` is byte-unchanged because the real fixture data
   has no HTML metacharacters.
-- **Slice 2 assumes USGS is reconciled before GDACS** in a combined `run()`. USGS
-  is the detection layer, so processing it first means a NEIC `sourceid` attaches
-  to the existing `usgs:` canonical event rather than minting a `gdacs:` one. The
-  reverse order (GDACS-first) would mint a `gdacs:` event that a later USGS record
-  cannot currently fold into — a full merge of two pre-existing canonical events
-  is out of slice-2 scope (documented in `resolve_canonical_id_gdacs`). When two
-  canonical_ids match within a tier, `sorted(...)[0]` keeps the pick deterministic.
+- **Slice 2 reconciles USGS before GDACS** in a combined `run()`. USGS is the
+  detection layer, so processing it first means a NEIC `sourceid` attaches to the
+  existing `usgs:` canonical event rather than minting a `gdacs:` one. (If GDACS
+  arrived first and minted `gdacs:EQ:…`, a later USGS record still folds in
+  correctly: `_link_gdacs_ids` writes the `(usgs, sourceid)` crosswalk row, so the
+  USGS record resolves onto that same canonical event via `resolve_canonical_id` —
+  no duplicate.) A genuine duplicate only arises for a non-NEIC, non-GLIDE pair
+  sharing only physical location, which needs slice-3 spatiotemporal matching and
+  is out of scope. A full merge of two *pre-existing* canonical events is likewise
+  out of scope; when two canonical_ids match within a tier, `sorted(...)[0]` keeps
+  the pick deterministic.
+- **Multiple GDACS records collapsing to one canonical event fold before writing.**
+  `reconcile_gdacs` groups records that resolve to the same `canonical_id`
+  (aftershocks sharing a GLIDE, or several episodes of one eventid in one payload)
+  and writes each group once from a deterministic fold — event-max
+  `gdacs_alertlevel` across the group, latest-episode fields chosen by
+  `(origin_time, episodeid, eventid)` (payload-order-independent). Writing
+  per-record instead let records overwrite each other's columns and re-fire the
+  UPDATE on every re-run (`last_updated` churn under a real clock, which would also
+  poison slice 5's "since last brief" diff). A newly-minted GDACS-only event gets a
+  base row inserted during the resolve pass so identifier links satisfy the
+  `feed_identifiers → canonical_events` FK and a later record can find it by GLIDE.
+  Found by an adversarial review subagent; the shipped tests missed it because they
+  used a single record or separate `reconcile_gdacs` calls.
 - **Slice 2 adds six nullable GDACS columns to `canonical_events`** via the
   `CREATE TABLE IF NOT EXISTS` schema, with no migration — consistent with
   `state/` being a git-ignored, ephemeral artifact until slice 7. A pre-existing

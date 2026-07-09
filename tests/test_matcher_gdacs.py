@@ -51,6 +51,34 @@ def test_glide_crosswalk_collapses_two_gdacs_records(frozen_clock, tmp_ledger):
         conn.close()
 
 
+def test_shared_glide_group_is_idempotent_and_folds_alert_max(frozen_clock, tmp_ledger):
+    # Two records sharing a GLIDE collapse to ONE canonical event, written once;
+    # re-running the identical payload writes nothing (no last_updated churn), and
+    # gdacs_alertlevel is the event-max across the group.
+    conn = connect(tmp_ledger)
+    try:
+        first = _gdacs("1551200", source="IDC", sourceid="idc1",
+                       glide="EQ-2026-1-IDN", alertlevel="Green")
+        second = _gdacs("1551201", source="GFZ", sourceid="gfz1",
+                        glide="EQ-2026-1-IDN", alertlevel="Orange")
+
+        assert reconcile_gdacs(conn, [first, second], frozen_clock) == 1  # one event, one write
+        assert conn.execute("SELECT COUNT(*) FROM canonical_events").fetchone()[0] == 1
+        assert reconcile_gdacs(conn, [first, second], frozen_clock) == 0  # idempotent re-run
+
+        row = conn.execute(
+            "SELECT gdacs_alertlevel, gdacs_episodealertlevel FROM canonical_events"
+        ).fetchone()
+        assert row["gdacs_alertlevel"] == "Orange"        # event-max folded across the group
+        assert row["gdacs_episodealertlevel"] == "Orange"  # latest episode
+
+        # Order-independent: reconciling the reversed payload leaves the stored
+        # columns unchanged (still a no-op).
+        assert reconcile_gdacs(conn, [second, first], frozen_clock) == 0
+    finally:
+        conn.close()
+
+
 def test_gdacs_native_key_stable_across_episodes(frozen_clock, tmp_ledger):
     conn = connect(tmp_ledger)
     try:
