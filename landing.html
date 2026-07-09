@@ -366,15 +366,15 @@
       <div class="exec-points">
         <div class="ep">
           <span class="ep-k">What it does</span>
-          <p>Watches three authoritative feeds around the clock, collapses the same event across them into one canonical record, and filters out routine noise.</p>
+          <p>Watches three authoritative feeds around the clock, collapses the same event across them into one canonical record — with humanitarian context attached — and filters out routine noise.</p>
         </div>
         <div class="ep">
           <span class="ep-k">What you get</span>
-          <p>A self-correcting 08:30 situation report — plus an immediate push for severe, confirmed events, and silence when nothing has changed.</p>
+          <p>A self-correcting 08:30 report, written in plain analyst language — plus an immediate push for severe, confirmed events, and silence when nothing has changed.</p>
         </div>
         <div class="ep">
           <span class="ep-k">Why it's trusted</span>
-          <p>A deterministic core: the same inputs always yield the same result, so every reconciliation and alert is testable and defensible.</p>
+          <p>A deterministic core does the reconciling and alerting — the same inputs always yield the same result — while a language model is trusted only to weigh impact and write the prose.</p>
         </div>
       </div>
     </div>
@@ -420,6 +420,21 @@
         <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg></div>
         <h3>Reproducible &amp; auditable</h3>
         <p>A deterministic core means the same inputs always yield the same result — every reconciliation is testable, traceable and defensible when the stakes are high.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M10.5 5.5l1-1a4 4 0 0 1 5.7 5.7l-1 1"/><path d="M13.5 18.5l-1 1a4 4 0 0 1-5.7-5.7l1-1"/></svg></div>
+        <h3>Humanitarian context, on the right event</h3>
+        <p>ReliefWeb disaster records, situation reports and needs assessments are linked back to the quake they describe — by GLIDE number, or a recorded fuzzy match — so context lands on the correct canonical event, never a duplicate.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 12.5h5"/></svg></div>
+        <h3>Reads like an analyst wrote it</h3>
+        <p>Once the deterministic core has locked the facts, a language model writes the plain-English impact assessment and briefing — judgement where it helps, never anywhere near the numbers or the alert decision.</p>
+      </div>
+      <div class="card">
+        <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v4h-4"/><path d="M12 8v4l3 2"/></svg></div>
+        <h3>Runs unattended, on a schedule</h3>
+        <p>Deploys as a scheduled agent that wakes on its own cadence, keeps a persistent ledger between ticks, and delivers each urgent alert exactly once — even across restarts. No server to babysit.</p>
       </div>
     </div>
   </div>
@@ -550,9 +565,17 @@
     </div>
     <div class="steps">
       <div class="step"><div class="n">01 · WATCH</div><h3>Poll the feeds</h3><p>Every ~30 minutes it fetches GDACS, USGS and ReliefWeb — efficiently, within each source's rate budget.</p></div>
-      <div class="step"><div class="n">02 · RECONCILE</div><h3>Merge into one truth</h3><p>The deterministic core matches events across feeds and keeps a single canonical record per real-world event.</p></div>
-      <div class="step"><div class="n">03 · ASSESS</div><h3>Judge severity</h3><p>Impact is scored; severe, high-confidence events trigger an immediate push instead of waiting.</p></div>
-      <div class="step"><div class="n">04 · BRIEF</div><h3>Publish at 08:30</h3><p>It diffs against yesterday and writes a self-correcting report to <code>dashboard.html</code> — then goes quiet.</p></div>
+      <div class="step"><div class="n">02 · RECONCILE</div><h3>Merge into one truth</h3><p>The deterministic core matches events across all three feeds and keeps a single canonical record per real-world event.</p></div>
+      <div class="step"><div class="n">03 · ASSESS</div><h3>Judge severity</h3><p>Confidence firms from provisional to confirmed as impact signals land; severe, confirmed events trigger an immediate push instead of waiting.</p></div>
+      <div class="step"><div class="n">04 · BRIEF</div><h3>Publish at 08:30</h3><p>It diffs against yesterday and a language model writes the self-correcting report to <code>dashboard.html</code> — then goes quiet.</p></div>
+    </div>
+
+    <div class="honest" style="margin-top:34px;">
+      <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6z"/><path d="M12 7v10M7.5 10.5h9"/></svg></div>
+      <div>
+        <h3>Deterministic where it counts. Judgement where it helps.</h3>
+        <p>The hot path — matching events across feeds, tracking every change, and deciding what breaks the silence — is plain, testable code: the same inputs always produce the same picture and the same alert. A language model is trusted only <em>above</em> that line, to weigh impact and write the brief in readable prose. So the numbers stay reproducible and the writing stays human — and neither job contaminates the other.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -574,19 +597,19 @@
     <div>
       <ul class="roadmap">
         <li>
-          <span class="now">Today</span>
-          <strong>Earthquakes, end to end</strong>
-          <p>USGS and GDACS reconciled into one canonical event, with a provisional→confirmed lifecycle on every quake — the proving ground for the pipeline.</p>
+          <span class="now">Shipped</span>
+          <strong>The full earthquake pipeline, live</strong>
+          <p>All three feeds — USGS, GDACS and ReliefWeb — reconciled into one canonical event, with a provisional→confirmed lifecycle, a six-state self-correcting change taxonomy, urgent push delivery, and a model-written 08:30 brief. Running unattended on a schedule.</p>
         </li>
         <li>
           <span class="now next">Next</span>
           <strong>Multi-hazard coverage</strong>
-          <p>Broadening across GDACS hazard types — cyclones, floods, volcanic activity — as each source is wired in.</p>
+          <p>Broadening across GDACS hazard types — cyclones, floods, volcanic activity — on the same pipeline that already generalises to them.</p>
         </li>
         <li>
           <span class="now next">Next</span>
-          <strong>Deeper impact assessment</strong>
-          <p>Beyond today's lifecycle, toward population-aware severity — PAGER loss bins and exposure counts on every confirmed event.</p>
+          <strong>Population-aware impact</strong>
+          <p>Beyond in-feed signals, toward enriched severity — pulling PAGER loss bins and exposure counts onto every confirmed event.</p>
         </li>
         <li>
           <span class="now next">Ahead</span>
