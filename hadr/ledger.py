@@ -21,8 +21,9 @@ from pathlib import Path
 
 from . import config
 from .clock import Clock
-from .fetch import GDACS_SOURCE, GLIDE_SOURCE, USGS_SOURCE
+from .fetch import GDACS_SOURCE, GLIDE_SOURCE, RELIEFWEB_SOURCE, USGS_SOURCE
 from .alert import EventFacts
+from .link_decisions import LinkDecision
 from .matcher import resolve_canonical_id, resolve_canonical_id_gdacs
 from .model import EventRow, GdacsRecord, QuakeRecord
 
@@ -455,6 +456,63 @@ def _link_gdacs_ids(
         "VALUES (?, ?, ?)",
         links,
     )
+
+
+def apply_link_decisions(
+    conn: sqlite3.Connection, decisions: list[LinkDecision]
+) -> int:
+    """Apply recorded fuzzy ReliefWeb<->event link decisions to the ledger (Slice
+    6, Seam 2). The fast tick — sole writer of ``ledger.db`` — calls this; the
+    08:30 brief only EMITS the decisions to a disjoint file. Each decision writes a
+    ``feed_identifiers`` row linking a ReliefWeb id to a canonical event. Returns
+    the number of links created or re-pointed.
+
+    RECORDED + OVERRIDABLE, the load-bearing property (PRD user story 36): a later
+    decision mapping the same ReliefWeb id to a DIFFERENT canonical event
+    re-points the link (the merge changes on the next run); re-applying the same
+    mapping writes nothing (idempotent). A decision whose target canonical event
+    does not exist is skipped, not a crash (failures are data) — nothing to link
+    yet, and the FK would otherwise blow up the tick."""
+    changed = 0
+    for d in decisions:
+        target = conn.execute(
+            "SELECT 1 FROM canonical_events WHERE canonical_id = ?", (d.canonical_id,)
+        ).fetchone()
+        if target is None:
+            continue  # no such event (yet) — skip rather than violate the FK
+        existing = conn.execute(
+            "SELECT canonical_id FROM feed_identifiers WHERE source = ? AND feed_id = ?",
+            (RELIEFWEB_SOURCE, d.reliefweb_id),
+        ).fetchone()
+        if existing is None:
+            conn.execute(
+                "INSERT INTO feed_identifiers (source, feed_id, canonical_id) "
+                "VALUES (?, ?, ?)",
+                (RELIEFWEB_SOURCE, d.reliefweb_id, d.canonical_id),
+            )
+            changed += 1
+        elif existing["canonical_id"] != d.canonical_id:
+            # Override: re-point the recorded link to the new canonical event.
+            conn.execute(
+                "UPDATE feed_identifiers SET canonical_id = ? "
+                "WHERE source = ? AND feed_id = ?",
+                (d.canonical_id, RELIEFWEB_SOURCE, d.reliefweb_id),
+            )
+            changed += 1
+        # else: identical mapping -> no write (re-apply is a true no-op).
+    conn.commit()
+    return changed
+
+
+def reliefweb_links(conn: sqlite3.Connection) -> dict[str, str]:
+    """Every recorded ReliefWeb->canonical-event link, as ``{reliefweb_id:
+    canonical_id}``. Read-only; the brief uses it to attach an item's excerpt to
+    the event it describes."""
+    rows = conn.execute(
+        "SELECT feed_id, canonical_id FROM feed_identifiers WHERE source = ?",
+        (RELIEFWEB_SOURCE,),
+    ).fetchall()
+    return {row["feed_id"]: row["canonical_id"] for row in rows}
 
 
 def read_events(conn: sqlite3.Connection) -> list[EventRow]:

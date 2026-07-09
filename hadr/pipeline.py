@@ -16,6 +16,7 @@ from .clock import Clock, format_sgt
 from .fetch import GDACS_SOURCE, USGS_SOURCE, FeedSource, parse_gdacs, parse_usgs
 from .ledger import (
     _is_deleted,
+    apply_link_decisions,
     connect,
     read_event_facts,
     read_events,
@@ -24,6 +25,7 @@ from .ledger import (
     reconcile_gdacs,
     record_pushed,
 )
+from .link_decisions import load_decisions
 from .matcher import resolve_canonical_id, resolve_canonical_id_gdacs
 from .model import FeedStatus, QuakeRecord, RunResult
 from .push import PushSink
@@ -42,6 +44,7 @@ def run(
     min_magnitude: float = config.MIN_MAGNITUDE,
     gdacs_source: FeedSource | None = None,
     push_sink: PushSink | None = None,
+    link_decisions_path: str | Path | None = None,
 ) -> RunResult:
     """Fetch -> parse -> reconcile USGS, then optionally the same for GDACS onto
     the same ledger, then (if a ``push_sink`` is injected) evaluate the urgent-
@@ -82,6 +85,12 @@ def run(
         # ``reachable``, so its events are never inferred absent (degradation, not
         # withdrawal). Same-fixture re-runs see every event, so this is a no-op.
         rows_written += reconcile_absences(conn, seen, reachable, clock)
+
+        # Apply any recorded fuzzy ReliefWeb<->event link decisions (Slice 6). The
+        # tick is the SOLE writer of ledger.db; the 08:30 brief only emits these to
+        # a disjoint file. Absent/empty file -> no-op. Idempotent + overridable.
+        if link_decisions_path is not None:
+            rows_written += apply_link_decisions(conn, load_decisions(link_decisions_path))
 
         alerts_pushed = _run_push(conn, push_sink, clock) if push_sink is not None else ()
 

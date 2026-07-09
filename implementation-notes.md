@@ -301,12 +301,83 @@ byte-unchanged):
   a same-day re-render byte-identical and makes the diff never read its own
   just-written snapshot.
 
+### Slice 6 — LLM judgement layer (impact prose, cannot-see disclosure, fuzzy ReliefWeb links)
+
+- **The model is an injected edge in the brief, judgement-only.**
+  `brief.write_brief(..., model: ChatModel | None = None, reliefweb=..., link_decisions_out=...)`.
+  When a model is given it (a) writes a one-line **impact basis** for each MATERIAL
+  event (reusing `briefer._is_material`) and (b) tie-breaks fuzzy ReliefWeb links.
+  When `model is None`, or a call returns `ChatResult(ok=False)`, or the reply is
+  empty, it degrades to a **deterministic basis** (`_deterministic_basis`: GDACS
+  colour + PAGER colour + magnitude + status from ledger facts). The model NEVER
+  decides scope or severity — that stays deterministic (Slice 3/5). Same fixtures +
+  frozen clock + a scripted model ⇒ deterministic WIRING; prose is never asserted.
+- **"What this monitor cannot see" is a config constant**
+  (`config.CANNOT_SEE_DISCLOSURE`), always rendered into the brief (PRD user story
+  4). Deterministic text, not model output — it is a policy statement that must read
+  the same every morning.
+- **Seam 2, the testable core: recorded + overridable link decisions.** The fuzzy
+  ReliefWeb↔event tie-break is emitted to a DISJOINT JSON file
+  (`state/link_decisions.json`, `hadr/link_decisions.py`); the fast tick applies it
+  via `ledger.apply_link_decisions` (INSERT the `feed_identifiers` reliefweb row, or
+  UPDATE it to a new canonical_id on override). RECORDED (persisted) + OVERRIDABLE (a
+  later file mapping the same reliefweb id elsewhere re-links next tick) + idempotent
+  (re-apply writes nothing). A decision for a non-existent canonical event is skipped,
+  not an FK crash (failures are data). Wired into `pipeline.run(link_decisions_path=…)`
+  — default `None`, so existing callers/tests are unaffected.
+- **ReliefWeb is represented minimally, NOT fetched** (`hadr/reliefweb.py`:
+  `ReliefWebRecord` = id/title/url/excerpt/glide?/source; `load_fixture`;
+  `resolve_glide`). Per issue #9 the RSS/API fetch is out of scope — a fixture
+  stands in (`fixtures/reliefweb/slice6.json`). Deterministic GLIDE links resolve
+  WITHOUT the model (reusing Slice 2's crosswalk seam via `feed_identifiers`); only
+  the fuzzy residual (no usable GLIDE) uses a recorded model decision. Copyright:
+  the brief renders **excerpt + link + "Source: ReliefWeb"** only (there is no
+  full-body field), respecting third-party copyright + the AI-content clause.
+- **The model reply for a link tie-break is VALIDATED against the real candidate
+  ids** — a hallucinated or `NONE` answer resolves to no link, so the model can only
+  pick an event that exists, never mint one.
+- **`/sitrep` skill** (`skills/sitrep/SKILL.md`, the Day-2 ≥1-skill artefact)
+  documents running the brief via `scripts/brief.py`, deterministic by default and
+  with `--model`/`--reliefweb`/`--link-decisions-out` for the judgement layer, and
+  restates the honesty rules.
+
 ## Open questions
 
 ## Deviations
 
 <!-- Anything built that departs from the PRD or CLAUDE.md is recorded here,
      with the reason. An undocumented deviation is a bug. -->
+
+- **Slice 6: the impact basis cites only the fields the ledger actually carries**
+  (GDACS episode colour, PAGER colour, magnitude, status), NOT the richer PAGER
+  loss bins / ShakeMap MMI+exposure the PRD (Q4) envisions. Those come from
+  enrichment fetches (PAGER/ShakeMap/GDACS `url.details`) that this slice does not
+  build — the ledger has no columns for them. The model prompt asks it to cite the
+  products it was *given*, and the deterministic fallback cites the colours; the
+  seam is in place to feed richer products later without shape change. Recorded so
+  the gap between the prose's ambition and the available facts is explicit.
+- **Slice 6: ReliefWeb is fixture-backed, not fetched** (issue #9 out-of-scope: the
+  RSS feed / v2 API). `hadr/reliefweb.py` + `fixtures/reliefweb/slice6.json` stand
+  in behind the same normalised `ReliefWebRecord` the live fetch will produce, so
+  linking + rendering + copyright handling are all exercised offline. No
+  `feedparser` dependency added.
+- **Slice 6: `state/link_decisions.json` is a git-ignored produced artifact**
+  (under the already-ignored `state/`), like `state/ledger.db` and
+  `state/published/`. Committing it and the single-writer commit-on-change
+  coordination is Slice 7. Tests use a tmp path; the brief CLI emits the file only
+  when `--model` is on (a keyless deterministic brief writes no decisions file and
+  touches no extra paths).
+- **Slice 6: `apply_link_decisions` makes a linked ReliefWeb id show up in an
+  event's `sources`** (via `_sources_for`, which already excludes only GLIDE). This
+  is intended — ReliefWeb corroborates — and never triggers a false absence-mark,
+  because `reconcile_absences` requires ALL of an event's sources reachable and
+  ReliefWeb is never fetched (never in `reachable`), so such events are simply left
+  alone (conservative). No existing test links ReliefWeb, so none is affected.
+- **Slice 6: `brief.py` imports `briefer._is_material`** (a leading-underscore
+  helper) to classify which events get an impact basis, rather than duplicating the
+  materiality rule. Reuse over a copy keeps the single config-driven definition
+  authoritative; the alternative was to promote it to a public name, deferred to
+  avoid touching Slice 3's surface.
 
 - **Slice 5: the disappearance-detection heuristic** (`ledger.reconcile_absences`)
   distinguishes retraction from aged-out from an outage using config windows

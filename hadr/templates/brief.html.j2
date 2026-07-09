@@ -1,11 +1,12 @@
 {#
   The 08:30 brief. Leads with the "Since the last brief" section — the buckets of
   what changed (New / Upgraded / Downgraded / Retracted / Aged-out / Correction),
-  each event with a trust-building detail where relevant — then folds the
-  ongoing/unchanged events below. If nothing material changed, a deterministic
-  "no material change" line stands in for the buckets (the model is gated off;
-  there is no model here this slice). Autoescape is on: titles/places are
-  third-party feed text.
+  each event with a trust-building detail where relevant, a model-authored (or
+  deterministic) IMPACT BASIS on material events, and any linked ReliefWeb context
+  as excerpt + link + attribution only (never the full body — third-party
+  copyright). Then the ongoing/unchanged events fold below, and a static "what
+  this monitor cannot see" disclosure closes the brief. Autoescape is on: titles,
+  places, model prose AND ReliefWeb text are all untrusted.
 #}
 <!DOCTYPE html>
 <html lang="en">
@@ -28,9 +29,20 @@
   .mag { font-variant-numeric: tabular-nums; font-weight: 600; }
   .place { color: #3a3a38; }
   .detail { display: block; color: #5b5b57; font-size: 0.88rem; margin-top: 2px; }
+  .impact-basis { display: block; font-size: 0.9rem; margin-top: 4px; }
+  .impact-basis .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+                         color: #8a6d1a; font-weight: 600; margin-right: 6px; }
+  .reliefweb { display: block; font-size: 0.85rem; color: #3a3a38; margin-top: 4px;
+               padding-left: 10px; border-left: 2px solid #cfc9b8; }
+  .reliefweb .attribution { color: #5b5b57; font-size: 0.78rem; }
   .ongoing { margin-top: 32px; }
   .ongoing h2 { font-size: 0.95rem; color: #5b5b57; text-transform: uppercase; letter-spacing: 0.04em; }
   .ongoing li { color: #5b5b57; font-size: 0.9rem; }
+  .cannot-see { margin-top: 40px; background: #f4f2ec; border-left: 4px solid #b30000;
+                padding: 12px 16px; border-radius: 0 6px 6px 0; }
+  .cannot-see h2 { font-size: 0.9rem; margin: 0 0 8px; color: #1a1a1a; text-transform: none; letter-spacing: 0; }
+  .cannot-see ul { list-style: disc; padding-left: 20px; }
+  .cannot-see li { border: none; padding: 3px 0; font-size: 0.88rem; color: #3a3a38; }
 </style>
 </head>
 <body>
@@ -38,6 +50,19 @@
   <h1>HADR morning brief</h1>
   <p class="as-of">as of {{ as_of }}</p>
 </header>
+
+{% macro event_body(e) %}
+  <span class="mag">{{ e.mag }}</span>
+  <span class="place">{{ e.title if e.title else e.place if e.place else "—" }}</span>
+  {% if e.detail %}<span class="detail">{{ e.detail }}</span>{% endif %}
+  {% if e.impact_basis %}<span class="impact-basis"><span class="label">Impact basis</span>{{ e.impact_basis }}</span>{% endif %}
+  {% for r in e.reliefweb %}
+  <span class="reliefweb">{{ r.excerpt }}
+    <a href="{{ r.url }}">{{ r.title }}</a>
+    <span class="attribution">— {{ r.source }}</span>
+  </span>
+  {% endfor %}
+{% endmacro %}
 
 <section class="since-last-brief">
   <h2>Since the last brief</h2>
@@ -50,11 +75,7 @@
     <h3>{{ bucket.label }} ({{ bucket.events|length }})</h3>
     <ul>
       {% for e in bucket.events %}
-      <li>
-        <span class="mag">{{ e.mag }}</span>
-        <span class="place">{{ e.title if e.title else e.place if e.place else "—" }}</span>
-        {% if e.detail %}<span class="detail">{{ e.detail }}</span>{% endif %}
-      </li>
+      <li>{{ event_body(e) }}</li>
       {% endfor %}
     </ul>
   </div>
@@ -68,10 +89,19 @@
   <h2>Ongoing / unchanged ({{ ongoing|length }})</h2>
   <ul>
     {% for e in ongoing %}
-    <li><span class="mag">{{ e.mag }}</span> {{ e.title if e.title else e.place if e.place else "—" }}</li>
+    <li>{{ event_body(e) }}</li>
     {% endfor %}
   </ul>
 </section>
 {% endif %}
+
+<section class="cannot-see">
+  <h2>What this monitor cannot see</h2>
+  <ul>
+    {% for line in cannot_see %}
+    <li>{{ line }}</li>
+    {% endfor %}
+  </ul>
+</section>
 </body>
 </html>

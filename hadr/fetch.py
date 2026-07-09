@@ -28,6 +28,11 @@ GDACS_SOURCE = "gdacs"
 # GLIDE is a cross-feed disaster number, not a feed of its own; it lives in the
 # same table so a GLIDE match can collapse records from different feeds.
 GLIDE_SOURCE = "glide"
+# ReliefWeb is the curated humanitarian-context feed (Slice 6). A ReliefWeb item
+# is linked to a canonical event either deterministically by GLIDE (reusing the
+# crosswalk above) or, for the fuzzy residual, by a RECORDED, overridable link
+# decision the fast tick applies (``ledger.apply_link_decisions``).
+RELIEFWEB_SOURCE = "reliefweb"
 
 
 class FeedSource(Protocol):
