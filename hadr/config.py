@@ -136,6 +136,16 @@ CANNOT_SEE_DISCLOSURE: tuple[str, ...] = (
 # Singapore Standard Time is a fixed UTC+8 (no DST). Used for the "as of" header.
 SGT_TZ_NAME: str = "Asia/Singapore"
 
+# --- Slice 7: single-writer commit coordination -------------------------------
+# The two schedulers (the ~30-min fast tick and the 08:30 brief) commit DISJOINT
+# paths, so their commits can never conflict on the binary ledger even when they
+# race (ADR-0006 + PRD #3 write coordination). The fast tick is the SOLE writer of
+# ledger.db; the brief owns only the rendered dashboard and today's readable
+# published snapshot. Ownership lives here — not in the commit helper's prose — so
+# "who may commit what" is reviewable in one place and gives the same answer twice.
+TICK_COMMIT_PATHS: tuple[str, ...] = ("state/ledger.db",)
+BRIEF_COMMIT_PATHS: tuple[str, ...] = ("dashboard.html", "state/published")
+
 # LLM provider: OpenCode Go, an OpenAI-compatible gateway (docs.opencode.ai/go).
 # The API key is read from the OPENCODE_API_KEY env var (never stored here);
 # these two are overridable via OPENCODE_BASE_URL / OPENCODE_MODEL. Go serves
