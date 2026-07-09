@@ -46,11 +46,19 @@ class FetchOutcome:
 
 @dataclass(frozen=True)
 class ParseResult:
-    """Result of parsing a feed body: either records, or a parse error."""
+    """Result of parsing a feed body: either records, or a parse error.
+
+    ``skipped`` counts individual features that were malformed and dropped while
+    the rest of the feed parsed successfully. A single junk feature must not sink
+    a whole feed of real quakes (failures are data, at feature granularity too),
+    so a per-feature error is counted here, not raised as ``ok=False``. Only a
+    broken *document* shape (invalid JSON, no ``features`` list) is ``ok=False``.
+    """
 
     ok: bool
     records: tuple[QuakeRecord, ...] = ()
     error: str | None = None
+    skipped: int = 0
 
 
 class FeedState(Enum):

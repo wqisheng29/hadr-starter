@@ -46,6 +46,8 @@ def run(
                 warnings.append(f"feed unparseable ({parsed.error}); ledger unchanged")
             else:
                 feed_status = FeedStatus.ok(USGS_SOURCE)
+                if parsed.skipped:
+                    warnings.append(f"skipped {parsed.skipped} malformed feature(s)")
                 qualifying = [r for r in parsed.records if _qualifies(r, min_magnitude)]
                 dropped = len(parsed.records) - len(qualifying)
                 if dropped:

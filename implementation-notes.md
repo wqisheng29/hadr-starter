@@ -129,6 +129,36 @@ token budget, so it exhausted the budget on reasoning + preamble and truncated
   timeout=)` and `llm.from_env`. This is a batch agent, not a latency-sensitive
   request, so a generous default is right.
 
+### Test hardening + robustness fixes (post-slice-1 audit)
+
+An adversarial audit of the merged slice-1 core surfaced two real robustness
+bugs and several untested guarantees. Fixed here (deterministic core only, no
+behaviour change on the shipped fixtures — the committed `dashboard.html` is
+byte-unchanged):
+
+- **One malformed feature no longer sinks the whole feed.** `parse_usgs` wrapped
+  the per-feature parse so a single `KeyError`/`IndexError` (a feature missing
+  `time`, a 1-element `coordinates`, a missing `geometry`) returned
+  `ParseResult(ok=False)` — discarding *every* good record and freezing the
+  ledger. On a real ~250-record USGS feed one junk record would block a day of
+  quakes. Now a bad feature is **skipped and counted** (`ParseResult.skipped`),
+  the good records survive, and the pipeline notes `skipped N malformed
+  feature(s)`. Only a broken *document* shape (invalid JSON, no `features` list)
+  is still `ok=False`. This is "failures are data" applied at feature
+  granularity.
+- **Non-finite magnitudes are treated as absent.** `json.loads` accepts the bare
+  `NaN`/`Infinity` tokens; a `NaN` magnitude broke idempotency (`nan != nan`
+  bumped `last_updated` every re-run) and an `inf` would clear the materiality
+  floor. `_maybe_float` now maps any non-finite value to `None` (so it is dropped
+  like a null magnitude), closing both holes at the parse seam.
+- **New regression tests** (51 → 66): parser feature-skip + document-shape
+  failures + magnitude coercion edges (string/int/null/NaN) + short/absent
+  coordinates; the equal-magnitude tie-break that keeps `dashboard.html`
+  byte-stable (`ORDER BY magnitude DESC, canonical_id ASC`); and the previously
+  untested `scripts/run.py` CLI (happy-path exit 0 + artifacts, bad/naive
+  `--as-of` exit 2, the required source group, and a graceful+idempotent run over
+  a feed carrying a malformed feature).
+
 ## Open questions
 
 ## Deviations

@@ -13,6 +13,7 @@ gracefully instead of crashing.
 """
 
 import json
+import math
 from pathlib import Path
 from typing import Protocol
 
@@ -76,8 +77,11 @@ def _parse_ids(raw: object, preferred_id: str) -> frozenset[str]:
 def parse_usgs(body: str) -> ParseResult:
     """Parse a USGS ``all_day.geojson`` body into normalised records.
 
-    Returns ``ParseResult(ok=False, ...)`` on anything malformed rather than
-    raising, so the caller can note an unparseable feed and carry on.
+    A broken *document* shape (invalid JSON, or no ``features`` list) returns
+    ``ParseResult(ok=False, ...)`` rather than raising, so the caller can note an
+    unparseable feed and carry on. An individual malformed *feature* is skipped
+    and tallied in ``ParseResult.skipped`` — one junk record must not discard a
+    whole feed of real quakes.
     """
     try:
         doc = json.loads(body)
@@ -88,14 +92,18 @@ def parse_usgs(body: str) -> ParseResult:
         return ParseResult(ok=False, error="not a GeoJSON FeatureCollection")
 
     records: list[QuakeRecord] = []
+    skipped = 0
     for feature in doc["features"]:
         try:
             record = _parse_feature(feature)
-        except (KeyError, TypeError, ValueError, IndexError) as exc:
-            return ParseResult(ok=False, error=f"malformed feature: {exc}")
+        except (KeyError, TypeError, ValueError, IndexError):
+            # Drop the bad feature, keep the good ones. A malformed record is data
+            # (a skip), not a reason to reject the whole feed.
+            skipped += 1
+            continue
         records.append(record)
 
-    return ParseResult(ok=True, records=tuple(records))
+    return ParseResult(ok=True, records=tuple(records), skipped=skipped)
 
 
 def _parse_feature(feature: object) -> QuakeRecord:
@@ -120,6 +128,14 @@ def _parse_feature(feature: object) -> QuakeRecord:
 
 
 def _maybe_float(value: object) -> float | None:
+    """Coerce to float, treating null and non-finite values as absent.
+
+    ``json.loads`` accepts the bare ``NaN``/``Infinity`` tokens, and a NaN would
+    break idempotency (``nan != nan`` makes every re-run look changed) while an
+    ``inf`` magnitude would sail past the materiality floor. A non-finite value is
+    not a usable measurement, so it is treated as null (and thus dropped).
+    """
     if value is None:
         return None
-    return float(value)
+    result = float(value)
+    return result if math.isfinite(result) else None
