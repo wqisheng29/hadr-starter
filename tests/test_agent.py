@@ -54,7 +54,8 @@ def test_full_loop_fetch_then_write_then_reply(fixture_source, tmp_out, frozen_c
     model = FakeModel([
         _wants_tools(("fetch_feed", '{"source": "usgs"}')),
         _wants_tools(("write_dashboard",
-                      '{"events": [{"title": "M6 Foo", "assessment": "notable"}]}')),
+                      '{"summary": "One notable quake overnight.", '
+                      '"events": [{"title": "M6 Foo", "assessment": "notable"}]}')),
         _says("Wrote the dashboard: one notable quake."),
     ])
     messages = [{"role": "system", "content": "orders"},
@@ -65,8 +66,10 @@ def test_full_loop_fetch_then_write_then_reply(fixture_source, tmp_out, frozen_c
     assert result.ok and result.reply.startswith("Wrote the dashboard")
     assert result.steps == 3
     assert tuple(i.name for i in result.invocations) == ("fetch_feed", "write_dashboard")
-    # the dashboard tool actually ran and wrote the file
-    assert tmp_out.exists() and "M6 Foo" in tmp_out.read_text(encoding="utf-8")
+    # the dashboard tool actually ran and wrote the file, summary included
+    html = tmp_out.read_text(encoding="utf-8")
+    assert tmp_out.exists() and "M6 Foo" in html
+    assert "Executive summary" in html and "One notable quake overnight" in html
     # tool results were fed back into the thread as role:"tool" turns
     tool_turns = [m for m in messages if m.get("role") == "tool"]
     assert len(tool_turns) == 2
