@@ -152,4 +152,24 @@ def test_from_env_uses_defaults_and_overrides(monkeypatch):
     model = llm.from_env()
     assert model.model == "deepseek-v4-pro"            # env override wins
     # default base url comes from config when the env var is absent
-    assert config.OPENCODE_BASE_URL == "https://opencode.ai/zen/go/v1"
+    assert model.base_url == config.OPENCODE_BASE_URL == "https://opencode.ai/zen/go/v1"
+
+
+def test_from_env_model_arg_overrides_but_keeps_base_url_env(monkeypatch):
+    # A --model flag must not reset a custom base URL to the default.
+    monkeypatch.setenv(llm.ENV_API_KEY, "k")
+    monkeypatch.setenv(llm.ENV_BASE_URL, "https://gw.internal/v1")
+    monkeypatch.setenv(llm.ENV_MODEL, "glm-5.2")
+    model = llm.from_env(model="kimi-k2.7-code")
+    assert model.model == "kimi-k2.7-code"             # explicit arg wins over env
+    assert model.base_url == "https://gw.internal/v1"  # env base URL preserved
+
+
+def test_null_content_without_tool_calls_is_empty_string():
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{
+            "message": {"content": None}, "finish_reason": "stop",
+        }]})
+
+    result = _model(handler).complete([{"role": "user", "content": "x"}])
+    assert result.ok and result.text == ""  # never None, so the CLI won't print "None"

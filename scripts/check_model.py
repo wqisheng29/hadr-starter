@@ -25,16 +25,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     try:
-        model = llm.from_env()
+        model = llm.from_env(model=args.model)
     except RuntimeError as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 2
 
-    if args.model:
-        model = llm.OpenCodeChatModel(config.OPENCODE_BASE_URL,
-                                      _key_from_env(), args.model)
-
-    print(f"endpoint: {config.OPENCODE_BASE_URL}")
+    print(f"endpoint: {model.base_url}")
     print(f"model:    {model.model}")
 
     available = model.list_models()
@@ -51,11 +47,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     print(f"✗ call failed: {result.error}", file=sys.stderr)
     return 1
-
-
-def _key_from_env() -> str:
-    import os
-    return os.environ[llm.ENV_API_KEY]
 
 
 if __name__ == "__main__":

@@ -80,6 +80,18 @@ Kept by the agent, reviewed by you. One entry per working block.
   `reports/sitrep.html` (git-ignored) via its own `agent_sitrep.html.j2` template,
   deliberately *not* the committed deterministic `dashboard.html` — the agent's
   output is model-authored and experimental, not the pipeline's product.
+- **Review follow-ups (post-build).** Two subagents reviewed the slice; fixes
+  applied: (1) `--model` now goes through `llm.from_env(model=...)` so it keeps
+  an `OPENCODE_BASE_URL` env override instead of silently resetting to the config
+  default (both `agent.py` and `check_model.py`; the latter's "endpoint:" line was
+  also lying — it now prints `model.base_url`). Removed the duplicated key-reading
+  helpers. (2) The materiality floor is no longer hardcoded in the system prompt:
+  `prompts/agent_system.md` carries a `{{MIN_MAGNITUDE}}` placeholder filled from
+  `config.MIN_MAGNITUDE` at load time, honouring "thresholds in config, not prose".
+  (3) Added `tests/test_briefer.py` so the deterministic dashboard's autoescape is
+  guarded directly (a regression to `select_autoescape()` would otherwise pass).
+  (4) `complete()` coerces null content to `""` so a reply is never `None`.
+  `--as-of` parse errors now exit cleanly instead of a traceback.
 
 ## Open questions
 

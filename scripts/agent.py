@@ -84,24 +84,29 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
 
     try:
-        model = llm.from_env()
+        model = llm.from_env(model=args.model)
     except RuntimeError as exc:
         print(f"✗ {exc}", file=sys.stderr)
         return 2
-    if args.model:
-        model = llm.OpenCodeChatModel(config.OPENCODE_BASE_URL, _key(), args.model)
 
     try:
         system_prompt = Path(args.system).read_text(encoding="utf-8")
     except OSError as exc:
         print(f"✗ could not read system prompt {args.system!r}: {exc}", file=sys.stderr)
         return 2
+    # Keep the one authoritative threshold in config, not prose: the prompt
+    # carries a {{MIN_MAGNITUDE}} placeholder we fill from config here.
+    system_prompt = system_prompt.replace("{{MIN_MAGNITUDE}}", str(config.MIN_MAGNITUDE))
 
-    clock = (
-        FrozenClock(datetime.fromisoformat(args.as_of.replace("Z", "+00:00")))
-        if args.as_of
-        else SystemClock()
-    )
+    try:
+        clock = (
+            FrozenClock(datetime.fromisoformat(args.as_of.replace("Z", "+00:00")))
+            if args.as_of
+            else SystemClock()
+        )
+    except ValueError as exc:
+        print(f"✗ bad --as-of {args.as_of!r}: {exc}", file=sys.stderr)
+        return 2
     registry = _build_registry(args.fixture, args.out, clock)
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
@@ -134,11 +139,6 @@ def main(argv: list[str] | None = None) -> int:
         messages.append({"role": "user", "content": user})
         _turn(model, messages, registry, args.max_steps)
     return 0
-
-
-def _key() -> str:
-    import os
-    return os.environ[llm.ENV_API_KEY]
 
 
 if __name__ == "__main__":

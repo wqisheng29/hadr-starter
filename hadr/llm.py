@@ -105,6 +105,10 @@ class OpenCodeChatModel:
     def model(self) -> str:
         return self._model
 
+    @property
+    def base_url(self) -> str:
+        return self._base
+
     def complete(
         self,
         messages: list[dict],
@@ -162,8 +166,11 @@ class OpenCodeChatModel:
                 message=assistant_message,
             )
 
+        # Coerce null content to "" so a plain reply is always a string, never
+        # None (the model returns null content when it only calls tools, and
+        # some turns come back with null content and finish_reason "stop").
         return ChatResult(
-            ok=True, text=content, tool_calls=tool_calls, message=assistant_message
+            ok=True, text=content or "", tool_calls=tool_calls, message=assistant_message
         )
 
     def list_models(self) -> list[str]:
@@ -181,12 +188,19 @@ class OpenCodeChatModel:
         return [m.get("id", "") for m in data if isinstance(m, dict)]
 
 
-def from_env(client: httpx.Client | None = None) -> OpenCodeChatModel:
+def from_env(
+    client: httpx.Client | None = None, *, model: str | None = None
+) -> OpenCodeChatModel:
     """Build the model from the environment.
 
     Requires ``OPENCODE_API_KEY``; ``OPENCODE_BASE_URL`` and ``OPENCODE_MODEL``
     fall back to the OpenCode Go defaults in ``config``. Raises a clear error if
     the key is missing rather than making a doomed request.
+
+    ``model`` (e.g. from a ``--model`` flag) overrides ``OPENCODE_MODEL`` / the
+    config default while still honouring an ``OPENCODE_BASE_URL`` env override —
+    unlike rebuilding the model from ``config`` at the call site, which would
+    silently reset the base URL to the default.
     """
     api_key = os.environ.get(ENV_API_KEY)
     if not api_key:
@@ -195,5 +209,5 @@ def from_env(client: httpx.Client | None = None) -> OpenCodeChatModel:
             f"`export {ENV_API_KEY}=...` (get one at https://opencode.ai/auth)."
         )
     base_url = os.environ.get(ENV_BASE_URL, config.OPENCODE_BASE_URL)
-    model = os.environ.get(ENV_MODEL, config.OPENCODE_MODEL)
+    model = model or os.environ.get(ENV_MODEL, config.OPENCODE_MODEL)
     return OpenCodeChatModel(base_url, api_key, model, client=client)

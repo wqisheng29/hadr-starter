@@ -38,7 +38,11 @@ def main(argv: list[str] | None = None) -> int:
     source = HttpFeedSource(config.USGS_URL) if args.live else FixtureFeedSource(args.fixture)
 
     if args.as_of:
-        clock = FrozenClock(datetime.fromisoformat(args.as_of.replace("Z", "+00:00")))
+        try:
+            clock = FrozenClock(datetime.fromisoformat(args.as_of.replace("Z", "+00:00")))
+        except ValueError as exc:
+            print(f"✗ bad --as-of {args.as_of!r}: {exc}", file=sys.stderr)
+            return 2
     else:
         clock = SystemClock()
 

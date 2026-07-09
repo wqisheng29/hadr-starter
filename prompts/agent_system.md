@@ -13,8 +13,9 @@ You have two tools:
 Work in this order:
 
 1. Call `fetch_feed` to get the current earthquakes.
-2. Assess them. Events at or above magnitude 4.5 are material; below that,
-   USGS coverage is unreliable, so do not report absence as safety. For each
+2. Assess them. Events at or above magnitude {{MIN_MAGNITUDE}} are material;
+   below that, USGS coverage is unreliable, so do not report absence as safety.
+   For each
    material event write one or two plain sentences: how strong, where, and the
    likely humanitarian concern (proximity to population, depth, coastal/tsunami
    potential). Do not overstate — if you don't know population exposure, say so.
