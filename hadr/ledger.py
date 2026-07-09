@@ -1,16 +1,22 @@
 """The ledger: SQLite store of canonical events (ADR-0003, ADR-0006).
 
-Slice 1 does insert-or-update only. A quake that vanishes from a later fetch is
-*left as-is*, never deleted — retraction/aged-out is deliberately slice 3+.
+Reconcile is insert-or-update. Disappearance is handled separately and
+deliberately (Slice 5): a quake that vanishes is NOT deleted — it is marked
+``retracted`` (a positive source withdrawal, still in window) or ``aged_out``
+(left the feed window) by ``reconcile_absences``, so the "since last brief" diff
+can distinguish the two. A USGS record carrying ``status == "deleted"`` is an
+explicit withdrawal and is marked retracted inline in ``reconcile``.
 
 Idempotency rests on ``reconcile`` doing a true no-op when nothing changed:
 ``last_updated`` is bumped only when a tracked field actually differs, so a
-plain re-run touches no rows even under a real (non-frozen) clock.
+plain re-run touches no rows even under a real (non-frozen) clock. Absence
+marking is likewise idempotent — an already-terminal (retracted/aged_out) row is
+never re-classified.
 """
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config
@@ -136,6 +142,24 @@ def _lifecycle_status(
     return config.STATUS_PROVISIONAL
 
 
+def _mark_status(
+    conn: sqlite3.Connection, canonical_id: str, status: str, now: str
+) -> bool:
+    """Set an existing event's ``status`` (bumping ``last_updated``) iff it exists
+    and the status actually differs. Returns True on a real write, so callers can
+    stay idempotent — re-marking the same status writes nothing."""
+    row = conn.execute(
+        "SELECT status FROM canonical_events WHERE canonical_id = ?", (canonical_id,)
+    ).fetchone()
+    if row is None or row["status"] == status:
+        return False
+    conn.execute(
+        "UPDATE canonical_events SET status = ?, last_updated = ? WHERE canonical_id = ?",
+        (status, now, canonical_id),
+    )
+    return True
+
+
 def _refresh_status(conn: sqlite3.Connection, canonical_id: str, now: str) -> bool:
     """Recompute a canonical event's lifecycle status from its stored signals and
     persist it if it changed (bumping ``last_updated`` only then — a no-op leaves
@@ -163,12 +187,30 @@ def _refresh_status(conn: sqlite3.Connection, canonical_id: str, now: str) -> bo
     return True
 
 
+def _is_deleted(record: QuakeRecord) -> bool:
+    """True if USGS published this record as a withdrawal (status "deleted")."""
+    return (record.status or "").lower() == config.DELETED_USGS_STATUS
+
+
 def reconcile(conn: sqlite3.Connection, records: list[QuakeRecord], clock: Clock) -> int:
-    """Upsert each record. Returns the number of rows inserted or updated."""
+    """Upsert each record. Returns the number of rows inserted or updated.
+
+    A record USGS marks ``deleted`` is a positive withdrawal: its canonical event
+    is set ``retracted`` and its measured fields are left untouched (no
+    resurrection of the old magnitude), rather than folded in as a normal update.
+    A deletion for an event we never stored is a no-op (nothing to retract)."""
     now = clock.now().isoformat()
     changed = 0
     for record in records:
         canonical_id = resolve_canonical_id(conn, record)
+
+        if _is_deleted(record):
+            # Link the id (so the id set stays complete) but do NOT upsert facts.
+            _link_ids(conn, record.ids, canonical_id)
+            if _mark_status(conn, canonical_id, config.STATUS_RETRACTED, now):
+                changed += 1
+            continue
+
         fields = _fields_from(record)
         existing = conn.execute(
             "SELECT * FROM canonical_events WHERE canonical_id = ?", (canonical_id,)
@@ -269,6 +311,73 @@ def reconcile_gdacs(
         # else: identical GDACS columns -> no write (keeps re-runs idempotent).
         _refresh_status(conn, canonical_id, now)
 
+    conn.commit()
+    return changed
+
+
+def _max_window_hours(sources: tuple[str, ...]) -> float:
+    """The widest feed revision window across an event's vouching sources. An
+    event is aged-out only once it exceeds the LONGEST window (a corroborated
+    event outlives the shortest feed's window), else it is a within-window
+    withdrawal. Windows are config-driven."""
+    windows: list[float] = []
+    if USGS_SOURCE in sources:
+        windows.append(config.USGS_WINDOW_HOURS)
+    if GDACS_SOURCE in sources:
+        windows.append(config.GDACS_WINDOW_DAYS * 24.0)
+    return max(windows) if windows else config.USGS_WINDOW_HOURS
+
+
+def reconcile_absences(
+    conn: sqlite3.Connection,
+    seen: set[str],
+    reachable_sources: set[str],
+    clock: Clock,
+) -> int:
+    """Mark events that DISAPPEARED this run as retracted or aged_out. Returns the
+    number of rows changed. Runs after both feeds reconcile, given the set of
+    canonical_ids ``seen`` in this run's reachable feeds and which feed sources
+    were ``reachable`` (fetched + parsed ok).
+
+    The heuristic, kept deterministic and conservative:
+
+    * An event still ``seen`` this run — untouched.
+    * An already-terminal (retracted/aged_out) event — untouched (sticky).
+    * An event whose vouching feeds were NOT all reachable — untouched. An OUTAGE
+      must never read as a retraction (degradation, not withdrawal).
+    * Otherwise the event genuinely vanished from every feed that vouched for it,
+      all of which were reachable: **aged_out** if its age exceeds the max feed
+      window (a normal scroll-out, "not confirmed ended"), else **retracted** (a
+      positive within-window withdrawal — it should still be listed but isn't).
+
+    Idempotent: re-marking the same status writes nothing, so a re-run is a no-op.
+    Unlike a push, an absence mark bumps ``last_updated`` — it is a real state
+    change, and it is the sole writer of these two statuses."""
+    now = clock.now()
+    now_iso = now.isoformat()
+    changed = 0
+    rows = conn.execute(
+        "SELECT canonical_id, status, origin_time FROM canonical_events"
+    ).fetchall()
+    for row in rows:
+        canonical_id = row["canonical_id"]
+        if canonical_id in seen:
+            continue
+        if row["status"] in (config.STATUS_RETRACTED, config.STATUS_AGED_OUT):
+            continue  # terminal & sticky — absence detection never re-classifies
+        sources = _sources_for(conn, canonical_id)
+        if not sources or not all(s in reachable_sources for s in sources):
+            continue  # a vouching feed was unreachable this run — do not infer
+        if row["origin_time"] is None:
+            continue  # cannot age an event with no origin time
+        age = now - datetime.fromisoformat(row["origin_time"])
+        new_status = (
+            config.STATUS_AGED_OUT
+            if age > timedelta(hours=_max_window_hours(sources))
+            else config.STATUS_RETRACTED
+        )
+        if _mark_status(conn, canonical_id, new_status, now_iso):
+            changed += 1
     conn.commit()
     return changed
 

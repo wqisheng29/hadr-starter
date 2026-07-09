@@ -39,6 +39,10 @@ GDACS_ALERT_RANK: dict[str, int] = {"green": 0, "orange": 1, "red": 2}
 STATUS_PROVISIONAL: str = "provisional"
 STATUS_CONFIRMED: str = "confirmed"
 CONFIRMED_USGS_STATUS: str = "reviewed"
+# USGS publishes withdrawn quakes with this review status; the pipeline reads it
+# as a POSITIVE source withdrawal and marks the canonical event retracted (Slice
+# 5), never a normal field update (it must not resurrect the old magnitude).
+DELETED_USGS_STATUS: str = "deleted"
 
 # Material/headline classification. An event is HEADLINE (material) if it is
 # CONFIRMED, or its current severity (GDACS `episodealertlevel` or USGS PAGER
@@ -54,6 +58,35 @@ MATERIAL_ALERT_LEVELS: frozenset[str] = frozenset({"orange", "red"})
 # most. This governs DASHBOARD surfacing only; it is NOT an urgent-push trigger
 # (that path stays confirmation-only, no magnitude escape hatch — Slice 4).
 HEADLINE_MIN_MAGNITUDE: float = 6.0
+
+# --- Slice 5: retraction / aged-out lifecycle + the "since last brief" diff ----
+# Two terminal lifecycle statuses beyond provisional/confirmed. RETRACTED = the
+# source POSITIVELY withdrew the event (a USGS deletion, or a feed record removed
+# while still in window); AGED_OUT = it merely left a feed's revision window (a
+# normal scroll-out, "not confirmed ended"). The two are never conflated — see
+# the disappearance-detection heuristic in ledger.reconcile_absences. Both are
+# sticky/terminal: absence detection never re-classifies an already-terminal row.
+STATUS_RETRACTED: str = "retracted"
+STATUS_AGED_OUT: str = "aged_out"
+
+# Feed revision windows, used only to tell aged-out from retraction on a
+# disappearance. USGS revises quakes for ~72h; GDACS carries an event for ~4
+# days. An event absent from a REACHABLE feed is aged_out once its age exceeds
+# the max window across its vouching feeds, else retracted (a within-window
+# withdrawal). Thresholds live here, not in prose.
+USGS_WINDOW_HOURS: float = 72.0
+GDACS_WINDOW_DAYS: float = 4.0
+
+# PAGER colour severity ranked on the SAME 0/1/2 scale as GDACS_ALERT_RANK, so
+# the impact tier can take the max across both feeds. Per the PRD Q5 impact-tier,
+# PAGER yellow/green share the low tier below orange (green < yellow are not
+# distinguished for up/downgrade purposes). Compared case-insensitively.
+PAGER_ALERT_RANK: dict[str, int] = {"green": 0, "yellow": 0, "orange": 1, "red": 2}
+
+# The impact tier at/above which a confirmed event counts as "confirmed-severe"
+# for the provisional->confirmed UPGRADE path (orange rank = 1). Keeps the
+# classification input in config, not the diff logic.
+MATERIAL_IMPACT_TIER: int = 1
 
 # --- Slice 4: urgent-alert decision + push -------------------------------------
 # The urgent-push rule is IMPACT-based, never magnitude — a strong but unconfirmed
@@ -74,6 +107,10 @@ URGENT_LEVEL_RANK: dict[str, int] = {"orange": 1, "red": 2}
 # Default artifact locations, relative to the current working directory.
 DEFAULT_DB_PATH: Path = Path("state/ledger.db")
 DEFAULT_OUT_PATH: Path = Path("dashboard.html")
+# Readable published snapshots the 08:30 brief diffs against (Slice 5). Under
+# state/ (git-ignored for now — a produced artifact until the Slice-7 commit
+# coordination lands, per implementation-notes.md).
+DEFAULT_PUBLISHED_DIR: Path = Path("state/published")
 
 # Singapore Standard Time is a fixed UTC+8 (no DST). Used for the "as of" header.
 SGT_TZ_NAME: str = "Asia/Singapore"
