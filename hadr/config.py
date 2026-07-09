@@ -28,3 +28,9 @@ SGT_TZ_NAME: str = "Asia/Singapore"
 # frontier models live on the separate pay-as-you-go Zen tier.
 OPENCODE_BASE_URL: str = "https://opencode.ai/zen/go/v1"
 OPENCODE_MODEL: str = "glm-5.2"
+
+# HTTP read/connect timeout for a single model call, in seconds. Generous on
+# purpose: glm-5.2 is a reasoning model and an agent turn (reason over the feed,
+# then emit a write_dashboard tool call) routinely runs past a minute. This is a
+# batch agent, not a latency-sensitive request. Override with OPENCODE_TIMEOUT.
+OPENCODE_TIMEOUT_S: float = 180.0

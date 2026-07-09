@@ -31,6 +31,7 @@ from . import config
 ENV_API_KEY = "OPENCODE_API_KEY"
 ENV_BASE_URL = "OPENCODE_BASE_URL"
 ENV_MODEL = "OPENCODE_MODEL"
+ENV_TIMEOUT = "OPENCODE_TIMEOUT"
 
 
 @dataclass(frozen=True)
@@ -95,11 +96,12 @@ class OpenCodeChatModel:
         api_key: str,
         model: str,
         client: httpx.Client | None = None,
+        timeout: float = config.OPENCODE_TIMEOUT_S,
     ) -> None:
         self._base = base_url.rstrip("/")
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self._model = model
-        self._client = client or httpx.Client(follow_redirects=True, timeout=60.0)
+        self._client = client or httpx.Client(follow_redirects=True, timeout=timeout)
 
     @property
     def model(self) -> str:
@@ -214,4 +216,10 @@ def from_env(
         )
     base_url = os.environ.get(ENV_BASE_URL, config.OPENCODE_BASE_URL)
     model = model or os.environ.get(ENV_MODEL, config.OPENCODE_MODEL)
-    return OpenCodeChatModel(base_url, api_key, model, client=client)
+    # OPENCODE_TIMEOUT (seconds) overrides the config default; a bad value falls
+    # back rather than crashing the run before it starts.
+    try:
+        timeout = float(os.environ.get(ENV_TIMEOUT, config.OPENCODE_TIMEOUT_S))
+    except ValueError:
+        timeout = config.OPENCODE_TIMEOUT_S
+    return OpenCodeChatModel(base_url, api_key, model, client=client, timeout=timeout)

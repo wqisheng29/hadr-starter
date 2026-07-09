@@ -179,6 +179,18 @@ def test_from_env_model_arg_overrides_but_keeps_base_url_env(monkeypatch):
     assert model.base_url == "https://gw.internal/v1"  # env base URL preserved
 
 
+def test_from_env_timeout_override_and_fallback(monkeypatch):
+    # A reasoning agent turn runs past the old 60s; the timeout is now
+    # configurable, with a generous default and a safe fallback on garbage.
+    monkeypatch.setenv(llm.ENV_API_KEY, "k")
+    monkeypatch.delenv(llm.ENV_TIMEOUT, raising=False)
+    assert llm.from_env()._client.timeout.read == config.OPENCODE_TIMEOUT_S
+    monkeypatch.setenv(llm.ENV_TIMEOUT, "240")
+    assert llm.from_env()._client.timeout.read == 240.0
+    monkeypatch.setenv(llm.ENV_TIMEOUT, "not-a-number")
+    assert llm.from_env()._client.timeout.read == config.OPENCODE_TIMEOUT_S  # fallback
+
+
 def test_null_content_without_tool_calls_is_empty_string():
     def handler(request):
         return httpx.Response(200, json={"choices": [{

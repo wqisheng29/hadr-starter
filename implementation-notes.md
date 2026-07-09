@@ -120,6 +120,14 @@ token budget, so it exhausted the budget on reasoning + preamble and truncated
 - **System prompt** updated to say `fetch_feed` returns pre-filtered material
   events and that calling `write_dashboard` is mandatory (invoke it, don't
   narrate it), including the zero-material-events case.
+- **HTTP timeout raised 60s → 180s and made configurable.** With the token fix
+  in place the *next* live run got further and then hit the hardcoded 60s httpx
+  timeout: glm-5.2 spent >60s reasoning over the feed and generating the
+  `write_dashboard` call (`ReadTimeout`, surfaced loudly by the broadened guard).
+  The per-call timeout now defaults to `config.OPENCODE_TIMEOUT_S` (180s) and is
+  overridable via `OPENCODE_TIMEOUT`, threaded through `OpenCodeChatModel(...,
+  timeout=)` and `llm.from_env`. This is a batch agent, not a latency-sensitive
+  request, so a generous default is right.
 
 ## Open questions
 
