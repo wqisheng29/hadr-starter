@@ -111,6 +111,27 @@ DEFAULT_OUT_PATH: Path = Path("dashboard.html")
 # state/ (git-ignored for now — a produced artifact until the Slice-7 commit
 # coordination lands, per implementation-notes.md).
 DEFAULT_PUBLISHED_DIR: Path = Path("state/published")
+# Disjoint fuzzy-link decisions file (Slice 6). The 08:30 brief (read-only on the
+# ledger) EMITS the model's ReliefWeb<->event tie-breaks here; the fast tick (sole
+# writer of ledger.db) APPLIES them next run. Under state/ (a produced artifact,
+# git-ignored) and disjoint from ledger.db so the two writers never collide.
+DEFAULT_LINK_DECISIONS_PATH: Path = Path("state/link_decisions.json")
+
+# --- Slice 6: "what this monitor cannot see" disclosure ------------------------
+# A static, deterministic honesty block rendered into every brief (PRD user story
+# 4): the operator must never mistake the monitor's silence for the absence of a
+# disaster. Prose lives here (config, not a prompt) because it must read the same
+# every morning — it is a policy statement, not model output.
+CANNOT_SEE_DISCLOSURE: tuple[str, ...] = (
+    "This monitor watches earthquakes only. It does NOT see floods, landslides, "
+    "heat, or conflict — treat its silence on those as no signal, not all-clear.",
+    "USGS global completeness is only ~M4.5-5.0; below that floor a quake's "
+    "absence is unreliable, so smaller events may be real but unseen.",
+    "A `tsunami:1` flag on a quake is a feed flag, NOT a NOAA tsunami warning — "
+    "check tsunami.gov for actual warnings.",
+    "ReliefWeb context arrives late and patchy; a missing humanitarian report "
+    "does not mean no humanitarian impact.",
+)
 
 # Singapore Standard Time is a fixed UTC+8 (no DST). Used for the "as of" header.
 SGT_TZ_NAME: str = "Asia/Singapore"

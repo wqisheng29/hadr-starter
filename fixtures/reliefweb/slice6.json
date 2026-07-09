@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "rw-antofagasta",
+      "title": "Chile: Antofagasta Earthquake - Flash Update No. 1",
+      "url": "https://reliefweb.int/report/chile/antofagasta-earthquake-flash-update-1",
+      "excerpt": "Initial assessments report structural damage in coastal districts; response teams are being mobilised.",
+      "glide": "EQ-2026-000999-CHL"
+    },
+    {
+      "id": "rw-mystery",
+      "title": "Humanitarian snapshot: recent seismic activity, South America",
+      "url": "https://reliefweb.int/report/south-america/humanitarian-snapshot-seismic",
+      "excerpt": "A regional snapshot referencing a strong offshore quake, without a GLIDE number.",
+      "glide": ""
+    }
+  ]
+}
