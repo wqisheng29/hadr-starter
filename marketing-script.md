@@ -79,10 +79,12 @@ the proof.*
 
 > And three that set it apart: it links **humanitarian context to the right
 > event** — ReliefWeb records tied back to the exact quake by GLIDE number or a
-> recorded match, never a duplicate. It **reads like an analyst wrote it** — a
-> language model writes the plain-English assessment, but only after the facts
-> are locked. And it **runs unattended, on a schedule** — a persistent ledger
-> between ticks, each urgent alert delivered exactly once, even across restarts.
+> recorded match, never a duplicate. And every judgement-call link is written
+> down, so if it ever links the wrong way, a person overrides it once and it
+> stays fixed. It **reads like an analyst wrote it** — a language model writes the
+> plain-English assessment, but only after the facts are locked. And it **runs
+> unattended, on a schedule** — a persistent ledger between ticks, each urgent
+> alert delivered exactly once, even across restarts.
 
 ---
 
@@ -178,6 +180,12 @@ the proof.*
 > trusted only *above* that line, to weigh impact and write readable prose. So the
 > numbers stay reproducible and the writing stays human — and neither job
 > contaminates the other.
+>
+> And there's a gate in front of the model: a cheap, deterministic check decides
+> whether anything material actually changed, and the model is woken only if it
+> did. So a quiet morning costs nothing and simply reads "no material change" —
+> the model never decides whether to run, and you're never billed, or bothered,
+> for a night when nothing happened.
 
 ---
 
@@ -204,12 +212,16 @@ the proof.*
 *Objection pre-empt. Owning the limits is what makes the briefings credible.*
 
 > Good situational awareness knows its own limits, and being explicit about them
-> is what keeps the briefings trustworthy. It doesn't replace official warnings —
-> a feed flag is not a NOAA tsunami warning. It doesn't cover every hazard yet —
-> earthquakes are end-to-end today; every brief names its own blind spots. It
-> doesn't republish others' reporting — link, short excerpt, attribution only. It
-> doesn't cry wolf, it doesn't decide for you, and it never guesses silently —
-> when a signal is provisional or missing, it says so.
+> is what keeps the briefings trustworthy. In fact, every briefing *closes* by
+> telling you what it couldn't see — it watches earthquakes only, not floods,
+> landslides, heat or conflict; global detection is reliable only to about
+> magnitude 4.5; and a feed's tsunami flag is not a NOAA tsunami warning. That's
+> deliberate: you should never mistake its silence for the absence of a disaster.
+>
+> The same honesty runs through the rest: it doesn't replace official warnings, it
+> doesn't republish others' reporting — link, short excerpt, attribution only — it
+> doesn't cry wolf, it doesn't decide for you, and it never guesses silently: when
+> a signal is provisional or missing, it says so.
 
 ---
 
@@ -251,7 +263,9 @@ the proof.*
   everything else before you cut those.
 - **Don't over-claim.** Everything in this script maps to shipped behaviour
   (earthquakes, three feeds, provisional→confirmed, the six-state diff, urgent
-  push, the 08:30 brief). Multi-hazard and population-aware enrichment are
-  explicitly framed as roadmap — keep them there.
+  push, the 08:30 brief, the model-writes-the-prose layer with human-overridable
+  links, the "what it can't see" disclosure, and the change-gated unattended
+  schedule). Multi-hazard and population-aware enrichment are explicitly framed as
+  roadmap — keep them there.
 - **Numbers to have ready:** three feeds, 24/7, ~30-minute refresh loop, one 08:30
   brief. They're on the stats strip if you need to point.
