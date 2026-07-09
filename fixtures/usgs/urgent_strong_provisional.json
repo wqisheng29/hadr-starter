@@ -1,0 +1,28 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1783342886000,
+    "title": "USGS All Earthquakes, Past Day",
+    "count": 1
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 7.2,
+        "place": "180 km SSW of an unpopulated ridge",
+        "time": 1783300000000,
+        "updated": 1783300300000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 798,
+        "ids": ",us7000strong,",
+        "type": "earthquake",
+        "title": "M 7.2 - 180 km SSW of an unpopulated ridge"
+      },
+      "geometry": { "type": "Point", "coordinates": [160.0, -30.0, 25.0] },
+      "id": "us7000strong"
+    }
+  ]
+}

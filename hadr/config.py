@@ -55,6 +55,22 @@ MATERIAL_ALERT_LEVELS: frozenset[str] = frozenset({"orange", "red"})
 # (that path stays confirmation-only, no magnitude escape hatch — Slice 4).
 HEADLINE_MIN_MAGNITUDE: float = 6.0
 
+# --- Slice 4: urgent-alert decision + push -------------------------------------
+# The urgent-push rule is IMPACT-based, never magnitude — a strong but unconfirmed
+# quake never fires (no escape hatch; that path is dashboard-only, above). An event
+# is SEVERE if its latest GDACS episode alert is Red, OR its USGS PAGER colour is
+# Orange/Red (PAGER is human-reviewed, so its presence also confirms the event via
+# Slice 3). Compared case-insensitively. GDACS Orange is deliberately NOT severe:
+# per the PRD the GDACS urgent trigger is Red only; the clean Orange->Red escalation
+# lives on the PAGER axis.
+URGENT_GDACS_LEVELS: frozenset[str] = frozenset({"red"})
+URGENT_PAGER_LEVELS: frozenset[str] = frozenset({"orange", "red"})
+
+# Rank of an urgent level, so escalation is comparable and one-push-per-event can
+# tell "same severity again" (no re-fire) from "genuinely worse" (fire again).
+# An event's current urgent level is the MAX-rank qualifying signal.
+URGENT_LEVEL_RANK: dict[str, int] = {"orange": 1, "red": 2}
+
 # Default artifact locations, relative to the current working directory.
 DEFAULT_DB_PATH: Path = Path("state/ledger.db")
 DEFAULT_OUT_PATH: Path = Path("dashboard.html")
