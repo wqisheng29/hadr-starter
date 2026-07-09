@@ -14,14 +14,20 @@ gracefully instead of crashing.
 
 import json
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
 import httpx
 
-from .model import FetchOutcome, ParseResult, QuakeRecord
+from .model import FetchOutcome, GdacsParseResult, GdacsRecord, ParseResult, QuakeRecord
 
+# Feed-identifier namespaces stored in ``feed_identifiers.source``.
 USGS_SOURCE = "usgs"
+GDACS_SOURCE = "gdacs"
+# GLIDE is a cross-feed disaster number, not a feed of its own; it lives in the
+# same table so a GLIDE match can collapse records from different feeds.
+GLIDE_SOURCE = "glide"
 
 
 class FeedSource(Protocol):
@@ -139,3 +145,78 @@ def _maybe_float(value: object) -> float | None:
         return None
     result = float(value)
     return result if math.isfinite(result) else None
+
+
+def parse_gdacs(body: str) -> GdacsParseResult:
+    """Parse a GDACS ``EVENTS4APP`` GeoJSON body into normalised records.
+
+    Mirrors ``parse_usgs``'s posture. A broken document *shape* (invalid JSON, no
+    ``features`` list) is a whole-feed failure (``ok=False``). Below that, the
+    feed degrades gracefully: a single malformed feature is skipped (counted in
+    ``skipped``) rather than sinking the run, and well-formed non-earthquake
+    events are filtered out (counted in ``non_eq_dropped``). Never raises.
+    """
+    try:
+        doc = json.loads(body)
+    except (json.JSONDecodeError, TypeError) as exc:
+        return GdacsParseResult(ok=False, error=f"invalid JSON: {exc}")
+
+    if not isinstance(doc, dict) or not isinstance(doc.get("features"), list):
+        return GdacsParseResult(ok=False, error="not a GeoJSON FeatureCollection")
+
+    records: list[GdacsRecord] = []
+    skipped = 0
+    non_eq_dropped = 0
+    for feature in doc["features"]:
+        if not isinstance(feature, dict) or not isinstance(feature.get("properties"), dict):
+            skipped += 1
+            continue
+        if str(feature["properties"].get("eventtype", "")) != "EQ":
+            non_eq_dropped += 1
+            continue
+        try:
+            records.append(_parse_gdacs_feature(feature))
+        except (KeyError, TypeError, ValueError, IndexError):
+            skipped += 1
+
+    return GdacsParseResult(
+        ok=True,
+        records=tuple(records),
+        skipped=skipped,
+        non_eq_dropped=non_eq_dropped,
+    )
+
+
+def _parse_gdacs_feature(feature: dict) -> GdacsRecord:
+    props = feature["properties"]
+    severity = props.get("severitydata") or {}
+    coords = (feature.get("geometry") or {}).get("coordinates") or []
+
+    return GdacsRecord(
+        eventtype=str(props["eventtype"]),
+        eventid=str(props["eventid"]),
+        episodeid=str(props.get("episodeid", "")),
+        glide=str(props.get("glide") or ""),
+        name=props.get("name"),
+        alertlevel=props.get("alertlevel"),
+        episodealertlevel=props.get("episodealertlevel"),
+        alertscore=_maybe_float(props.get("alertscore")),
+        episodealertscore=_maybe_float(props.get("episodealertscore")),
+        country=props.get("country"),
+        iso3=props.get("iso3"),
+        source=str(props.get("source") or ""),
+        sourceid=str(props.get("sourceid") or ""),
+        magnitude=_maybe_float(severity.get("severity")),
+        origin_time_ms=_gdacs_time_ms(props["fromdate"]),
+        longitude=float(coords[0]) if len(coords) > 0 else None,
+        latitude=float(coords[1]) if len(coords) > 1 else None,
+        depth_km=_maybe_float(coords[2]) if len(coords) > 2 else None,
+    )
+
+
+def _gdacs_time_ms(value: object) -> int:
+    """Parse a GDACS ``fromdate`` ISO string to epoch ms (naive == UTC)."""
+    dt = datetime.fromisoformat(str(value))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp() * 1000)
