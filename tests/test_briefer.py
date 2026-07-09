@@ -29,3 +29,27 @@ def test_dashboard_autoescapes_untrusted_feed_text():
 def test_dashboard_renders_empty_state():
     html = render_dashboard([], _AS_OF, FeedStatus.ok("usgs"))
     assert "No earthquakes" in html
+
+
+def test_empty_dashboard_has_no_summary():
+    html = render_dashboard([], _AS_OF, FeedStatus.ok("usgs"))
+    assert "Executive summary" not in html
+
+
+def test_dashboard_summary_counts_and_headline():
+    events = [
+        EventRow(canonical_id="usgs:a", title="M6.8", magnitude=6.8,
+                 place="120 km SW of Padang, Indonesia",
+                 origin_time="2026-07-06T01:06:40+00:00"),
+        EventRow(canonical_id="usgs:b", title="M6.0", magnitude=6.0,
+                 place="Somewhere", origin_time="2026-07-06T02:00:00+00:00"),
+        EventRow(canonical_id="usgs:c", title="M4.5", magnitude=4.5,
+                 place="Minor place", origin_time="2026-07-06T03:00:00+00:00"),
+    ]
+    html = render_dashboard(events, _AS_OF, FeedStatus.ok("usgs"))
+
+    # The summary leads the brief, counts each bucket, and names the headline event.
+    assert "Executive summary" in html
+    assert "2 material earthquakes" in html
+    assert "led by M6.8 — 120 km SW of Padang, Indonesia" in html
+    assert "1 routine or ongoing event below the fold" in html

@@ -83,6 +83,47 @@ def _view(e: EventRow) -> dict:
     }
 
 
+def _plural(n: int) -> str:
+    return "" if n == 1 else "s"
+
+
+def _compose_summary(headline: list[dict], routine: list[dict], banners: list[dict]) -> str | None:
+    """Compose the executive-summary line deterministically from the classified
+    view models — counts plus the single headline event. No model and no network:
+    the same events + same feed status always yield the same summary, so the
+    dashboard stays byte-reproducible. Returns ``None`` for an empty picture, so
+    the template renders no summary block."""
+    if not headline and not routine:
+        return None
+
+    parts: list[str] = []
+    if headline:
+        top = headline[0]  # events arrive magnitude-desc, so [0] is the headline
+        mag = f"M{top['magnitude']:.1f}" if top["magnitude"] is not None else "an unsized quake"
+        where = top["place"] or top["title"] or "an unnamed location"
+        parts.append(
+            f"{len(headline)} material earthquake{_plural(len(headline))} on the board, "
+            f"led by {mag} — {where}."
+        )
+    else:
+        parts.append("No material earthquakes are currently headlined.")
+
+    if routine:
+        parts.append(
+            f"Plus {len(routine)} routine or ongoing event{_plural(len(routine))} "
+            f"below the fold."
+        )
+
+    if banners:
+        was = "was" if len(banners) == 1 else "were"
+        parts.append(
+            f"{len(banners)} feed{_plural(len(banners))} {was} unreachable at run "
+            f"time — showing the last known picture."
+        )
+
+    return " ".join(parts)
+
+
 def render_dashboard(
     events: list[EventRow],
     as_of_utc: datetime,
@@ -110,6 +151,7 @@ def render_dashboard(
     ]
     return template.render(
         as_of=format_sgt(as_of_utc),
+        summary=_compose_summary(headline, routine, banners),
         events=views,
         headline=headline,
         routine=routine,
