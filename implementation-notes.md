@@ -263,6 +263,44 @@ byte-unchanged):
   split. Fired alerts are returned in `RunResult.alerts_pushed`. No real-network
   push here (the CLI wires no production sink yet).
 
+### Slice 5 — self-correcting 08:30 brief (deterministic diff)
+
+- **The diff is pure and LLM-free** (`hadr/diff.py`): `impact_tier` +
+  `classify` + `build_diff`, unit-tested in isolation. `impact_tier(status,
+  gdacs_episodealertlevel, pager_alert)` is the MAX severity rank across the GDACS
+  episode colour and the PAGER colour on one shared 0/1/2 scale
+  (`GDACS_ALERT_RANK` + a new `PAGER_ALERT_RANK` where yellow/green share the low
+  tier, per PRD Q5). Confirmation is deliberately NOT folded into the tier —
+  provisional→confirmed-severe is a separate branch in `classify` — so a
+  re-review can never masquerade as a colour move.
+- **The three distinctions the PRD forbids conflating, encoded by reading
+  `status` BEFORE tier:** a colour drop (even Red→Green) is **Downgraded** (still
+  real); only `status == retracted` (a positive withdrawal) is **Retracted**; a
+  magnitude revision with the tier unchanged is a **Correction**, not a re-rank;
+  `status == aged_out` is **Aged-out** ("not confirmed ended"). Only the
+  *transition into* a terminal status is a change bucket — an already-terminal
+  event that was terminal in the last brief folds to **Ongoing**, so a re-brief is
+  idempotent.
+- **Retraction/aged-out now live in the ledger** (`ledger.reconcile_absences`, run
+  after both feeds reconcile in `run()`). Two new statuses
+  (`STATUS_RETRACTED`/`STATUS_AGED_OUT`). A USGS record with
+  `status == "deleted"` (`DELETED_USGS_STATUS`) is marked retracted inline in
+  `reconcile` without folding in its (stale) magnitude. Disappearance detection is
+  the load-bearing heuristic — see the deviation note below.
+- **Brief is READ-ONLY on the ledger, enforced by SQLite** (`brief._connect_readonly`
+  opens `file:…?mode=ro`, so a stray write raises). It reads current events + the
+  last published snapshot, computes the diff, renders `dashboard.html` with a
+  "Since the last brief" section on top, THEN writes today's snapshot LAST — the
+  two writes (`published/<SGT-date>.json`, `dashboard.html`) are disjoint from
+  `ledger.db`. The brief never pushes and runs no model (where prose goes is a
+  deterministic placeholder for Slice 6).
+- **Published snapshots** (`hadr/published.py`) are readable JSON (indent=2,
+  sort_keys, events sorted by canonical_id) with schema version + SGT/UTC "as of".
+  `load_latest_snapshot` reads the lexicographically greatest filename STRICTLY
+  LESS than today's SGT date — "the last brief" is always a prior one, which keeps
+  a same-day re-render byte-identical and makes the diff never read its own
+  just-written snapshot.
+
 ## Open questions
 
 ## Deviations
@@ -270,6 +308,38 @@ byte-unchanged):
 <!-- Anything built that departs from the PRD or CLAUDE.md is recorded here,
      with the reason. An undocumented deviation is a bug. -->
 
+- **Slice 5: the disappearance-detection heuristic** (`ledger.reconcile_absences`)
+  distinguishes retraction from aged-out from an outage using config windows
+  (`USGS_WINDOW_HOURS = 72`, `GDACS_WINDOW_DAYS = 4`). After both feeds reconcile,
+  an event NOT seen this run is marked **aged_out** if its age exceeds the MAX
+  window across its vouching feeds, else **retracted** (within-window withdrawal).
+  Three guards keep it conservative: (a) an event whose vouching feeds were not
+  ALL reachable this run is left alone — an outage must never read as a
+  withdrawal (degradation); (b) already-terminal rows are never re-classified
+  (sticky); (c) an event with no origin time is skipped. The "seen" sets are
+  threaded up from `_run_usgs`/`_run_gdacs` (resolved via the existing matcher,
+  deterministic post-reconcile) and `run()`'s signature is unchanged, so existing
+  callers/tests are unaffected — same-fixture re-runs see every event, so nothing
+  is spuriously marked. Absence marks bump `last_updated` (a real state change,
+  unlike a push) and DO count toward `rows_written`; the count is 0 on every
+  pre-Slice-5 fixture, so existing `rows_written` assertions hold.
+- **Slice 5: `state/published/` is a git-ignored produced artifact** (like
+  `state/ledger.db`). ADR-0006 commits the readable snapshot as the audit trail;
+  committing it — and the single-writer commit-on-change coordination — is Slice 7.
+  For now the brief writes it under the git-ignored `state/` and tests use a tmp
+  `published_dir` so run 2 reads run 1's snapshot.
+- **Slice 5: the brief renders its OWN template** (`templates/brief.html.j2`,
+  its own autoescape=True Jinja env in `brief.py`), structurally different from
+  the tick's `dashboard.html.j2` — the "Since the last brief" section has no
+  analogue in the current-state tick dashboard. The tick's `run()` output and the
+  committed `dashboard.html` are byte-unchanged (verified by diff). Both the brief
+  and the tick may write `dashboard.html`; wiring the 08:30 brief as the canonical
+  writer of the committed file is Slice 7's scheduling concern.
+- **Slice 5: the brief CLI (`scripts/brief.py`) does not fetch or reconcile** — it
+  only reads the ledger (read-only) + last snapshot and writes the disjoint
+  artifacts. `scripts/run.py` remains the (USGS-only) tick CLI; it has no GDACS
+  flag (a pre-existing slice-1 limitation), so a full GDACS-inclusive brief is
+  driven through `pipeline.run(gdacs_source=…)` (as the tests do), not the tick CLI.
 - **Slice 4: `last_pushed_level` is not a reconcile-tracked field.** It records the
   alert level last pushed (one-push-per-event across stateless ticks) but is
   excluded from `_TRACKED`/`_GDACS_TRACKED`, so it never affects reconcile
@@ -295,6 +365,8 @@ byte-unchanged):
   `dashboard.html` is still committed (it is the product).
 - **Reconcile is insert/update-only.** A quake absent from a later fetch is left
   as-is, never deleted — retraction/aged-out status is deliberately slice 3+.
+  *(Superseded in Slice 5: `reconcile_absences` now marks disappearance as
+  `retracted`/`aged_out` — the row is still never DELETEd, only re-statused.)*
 - **The committed `dashboard.html` changed structure this slice** (the
   byte-identical-to-slice-1 guarantee was slices 1–2 only). It is regenerated
   deterministically via `python scripts/run.py --fixture fixtures/usgs/all_day.json

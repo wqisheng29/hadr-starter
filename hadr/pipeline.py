@@ -15,13 +15,16 @@ from .briefer import write_dashboard
 from .clock import Clock, format_sgt
 from .fetch import GDACS_SOURCE, USGS_SOURCE, FeedSource, parse_gdacs, parse_usgs
 from .ledger import (
+    _is_deleted,
     connect,
     read_event_facts,
     read_events,
     reconcile,
+    reconcile_absences,
     reconcile_gdacs,
     record_pushed,
 )
+from .matcher import resolve_canonical_id, resolve_canonical_id_gdacs
 from .model import FeedStatus, QuakeRecord, RunResult
 from .push import PushSink
 
@@ -56,14 +59,29 @@ def run(
     try:
         warnings: list[str] = []
 
-        feed_status, usgs_rows = _run_usgs(conn, source, clock, min_magnitude, warnings)
+        feed_status, usgs_rows, usgs_seen = _run_usgs(
+            conn, source, clock, min_magnitude, warnings
+        )
         feed_statuses = [feed_status]
         rows_written = usgs_rows
+        seen: set[str] = set(usgs_seen)
+        reachable: set[str] = {USGS_SOURCE} if feed_status.is_ok else set()
 
         if gdacs_source is not None:
-            gdacs_status, gdacs_rows = _run_gdacs(conn, gdacs_source, clock, warnings)
+            gdacs_status, gdacs_rows, gdacs_seen = _run_gdacs(
+                conn, gdacs_source, clock, warnings
+            )
             feed_statuses.append(gdacs_status)
             rows_written += gdacs_rows
+            seen |= gdacs_seen
+            if gdacs_status.is_ok:
+                reachable.add(GDACS_SOURCE)
+
+        # After every reachable feed reconciles, mark the events that disappeared
+        # (retracted vs. aged_out). An unreachable feed contributes nothing to
+        # ``reachable``, so its events are never inferred absent (degradation, not
+        # withdrawal). Same-fixture re-runs see every event, so this is a no-op.
+        rows_written += reconcile_absences(conn, seen, reachable, clock)
 
         alerts_pushed = _run_push(conn, push_sink, clock) if push_sink is not None else ()
 
@@ -101,41 +119,57 @@ def _run_push(conn, push_sink: PushSink, clock: Clock) -> tuple[Alert, ...]:
     return tuple(fired)
 
 
-def _run_usgs(conn, source, clock, min_magnitude, warnings) -> tuple[FeedStatus, int]:
+def _run_usgs(
+    conn, source, clock, min_magnitude, warnings
+) -> tuple[FeedStatus, int, set[str]]:
     outcome = source.fetch()
     if not outcome.ok:
         detail = outcome.error or f"HTTP {outcome.status}"
         warnings.append(f"feed unreachable ({detail}); ledger unchanged")
-        return FeedStatus.unreachable(USGS_SOURCE, detail), 0
+        return FeedStatus.unreachable(USGS_SOURCE, detail), 0, set()
 
     parsed = parse_usgs(outcome.body or "")
     if not parsed.ok:
         warnings.append(f"feed unparseable ({parsed.error}); ledger unchanged")
-        return FeedStatus.unparseable(USGS_SOURCE, parsed.error or "parse error"), 0
+        return FeedStatus.unparseable(USGS_SOURCE, parsed.error or "parse error"), 0, set()
 
     if parsed.skipped:
         warnings.append(f"skipped {parsed.skipped} malformed feature(s)")
-    qualifying = [r for r in parsed.records if _qualifies(r, min_magnitude)]
+    # A deleted record is a withdrawal, not a measurement — it bypasses the
+    # materiality floor (its magnitude may be gone) so the retraction is applied.
+    qualifying = [
+        r for r in parsed.records if _qualifies(r, min_magnitude) or _is_deleted(r)
+    ]
     dropped = len(parsed.records) - len(qualifying)
     if dropped:
         warnings.append(f"dropped {dropped} sub-M{min_magnitude} quake(s)")
-    return FeedStatus.ok(USGS_SOURCE), reconcile(conn, qualifying, clock)
+    rows = reconcile(conn, qualifying, clock)
+    # ``seen`` = every canonical event PRESENT in the feed this run — computed over
+    # all parsed records, NOT just the qualifying ones. An event revised below the
+    # materiality floor is still listed by USGS (not withdrawn), so it must count as
+    # seen or absence detection would falsely retract/age it. Resolution is
+    # deterministic post-reconcile (a previously-stored event keeps its linked ids).
+    seen = {resolve_canonical_id(conn, r) for r in parsed.records}
+    return FeedStatus.ok(USGS_SOURCE), rows, seen
 
 
-def _run_gdacs(conn, source, clock, warnings) -> tuple[FeedStatus, int]:
+def _run_gdacs(conn, source, clock, warnings) -> tuple[FeedStatus, int, set[str]]:
     outcome = source.fetch()
     if not outcome.ok:
         detail = outcome.error or f"HTTP {outcome.status}"
         warnings.append(f"GDACS feed unreachable ({detail}); ledger unchanged")
-        return FeedStatus.unreachable(GDACS_SOURCE, detail), 0
+        return FeedStatus.unreachable(GDACS_SOURCE, detail), 0, set()
 
     parsed = parse_gdacs(outcome.body or "")
     if not parsed.ok:
         warnings.append(f"GDACS feed unparseable ({parsed.error}); ledger unchanged")
-        return FeedStatus.unparseable(GDACS_SOURCE, parsed.error or "parse error"), 0
+        return FeedStatus.unparseable(GDACS_SOURCE, parsed.error or "parse error"), 0, set()
 
     if parsed.skipped:
         warnings.append(f"skipped {parsed.skipped} malformed GDACS feature(s)")
     if parsed.non_eq_dropped:
         warnings.append(f"dropped {parsed.non_eq_dropped} non-earthquake GDACS event(s)")
-    return FeedStatus.ok(GDACS_SOURCE), reconcile_gdacs(conn, list(parsed.records), clock)
+    records = list(parsed.records)
+    rows = reconcile_gdacs(conn, records, clock)
+    seen = {resolve_canonical_id_gdacs(conn, r) for r in records}
+    return FeedStatus.ok(GDACS_SOURCE), rows, seen
