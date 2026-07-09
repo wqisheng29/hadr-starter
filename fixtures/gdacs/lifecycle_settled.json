@@ -1,0 +1,35 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [130.5, -5.2] },
+      "properties": {
+        "eventtype": "EQ",
+        "eventid": 1560000,
+        "episodeid": 1720001,
+        "glide": "",
+        "name": "Earthquake near Banda Sea",
+        "htmldescription": "Green M 5.4 Earthquake in Banda Sea.",
+        "alertlevel": "Green",
+        "alertscore": 0.9,
+        "episodealertlevel": "Green",
+        "episodealertscore": 0.9,
+        "istemporary": "false",
+        "iscurrent": "true",
+        "country": "Indonesia",
+        "iso3": "IDN",
+        "fromdate": "2026-07-08T00:20:00",
+        "todate": "2026-07-08T00:20:00",
+        "datemodified": "2026-07-08T02:30:00",
+        "source": "GFZ",
+        "sourceid": "gfz1560000",
+        "severitydata": {
+          "severity": 5.4,
+          "severitytext": "Magnitude 5.4M",
+          "severityunit": "M"
+        }
+      }
+    }
+  ]
+}

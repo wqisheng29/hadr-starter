@@ -40,7 +40,10 @@ CREATE TABLE IF NOT EXISTS canonical_events (
     gdacs_alertlevel        TEXT,
     gdacs_episodealertlevel TEXT,
     glide                   TEXT,
-    country                 TEXT
+    country                 TEXT,
+    usgs_status             TEXT,
+    pager_alert             TEXT,
+    gdacs_is_temporary      INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS feed_identifiers (
@@ -52,14 +55,19 @@ CREATE TABLE IF NOT EXISTS feed_identifiers (
 """
 
 # Fields compared to decide whether an UPDATE (and last_updated bump) is needed.
+# ``usgs_status``/``pager_alert`` are lifecycle signals (Slice 3): a change bumps
+# last_updated, and being tracked keeps a re-run a true no-op.
 _TRACKED = ("magnitude", "depth_km", "place", "title", "origin_time",
-            "longitude", "latitude", "usgs_preferred_id", "usgs_ids")
+            "longitude", "latitude", "usgs_preferred_id", "usgs_ids",
+            "usgs_status", "pager_alert")
 
 # GDACS-derived columns. Reconciling GDACS touches only these — never the
 # USGS-owned fields above — so a corroborating GDACS record cannot clobber the
 # authoritative USGS magnitude/place/title on a combined event.
+# ``gdacs_is_temporary`` (0/1) is the GDACS settle signal (Slice 3).
 _GDACS_TRACKED = ("gdacs_eventid", "gdacs_episodeid", "gdacs_alertlevel",
-                  "gdacs_episodealertlevel", "glide", "country")
+                  "gdacs_episodealertlevel", "glide", "country",
+                  "gdacs_is_temporary")
 
 # GDACS event-type code -> canonical hazard_type. Earthquakes only this slice.
 _HAZARD_BY_EVENTTYPE = {"EQ": "earthquake"}
@@ -91,7 +99,66 @@ def _fields_from(record: QuakeRecord) -> dict[str, object]:
         "latitude": record.latitude,
         "usgs_preferred_id": record.preferred_id,
         "usgs_ids": json.dumps(sorted(record.ids)),
+        "usgs_status": record.status,
+        "pager_alert": record.pager_alert,
     }
+
+
+def _has_confirming_signal(
+    usgs_status: str | None, pager_alert: str | None, gdacs_is_temporary: object
+) -> bool:
+    """True if any feed-native confirming signal is present (Slice 3). Inputs are
+    the stored columns; NO enrichment fetch — confirmation reflects only what the
+    feeds already carried. Thresholds/sets live in ``config``."""
+    if usgs_status is not None and usgs_status.lower() == config.CONFIRMED_USGS_STATUS:
+        return True
+    if pager_alert:  # a non-null/non-empty PAGER colour is a settled impact signal
+        return True
+    if gdacs_is_temporary is not None and int(gdacs_is_temporary) == 0:
+        return True  # GDACS istemporary flipped off -> settled (e.g. ShakeMap)
+    return False
+
+
+def _lifecycle_status(
+    current: str | None,
+    usgs_status: str | None,
+    pager_alert: str | None,
+    gdacs_is_temporary: object,
+) -> str:
+    """The lifecycle status given a row's current status and stored signals.
+    Confirmation is STICKY: once confirmed, never regresses to provisional."""
+    if current == config.STATUS_CONFIRMED:
+        return config.STATUS_CONFIRMED
+    if _has_confirming_signal(usgs_status, pager_alert, gdacs_is_temporary):
+        return config.STATUS_CONFIRMED
+    return config.STATUS_PROVISIONAL
+
+
+def _refresh_status(conn: sqlite3.Connection, canonical_id: str, now: str) -> bool:
+    """Recompute a canonical event's lifecycle status from its stored signals and
+    persist it if it changed (bumping ``last_updated`` only then — a no-op leaves
+    the row untouched, so re-runs don't thrash it). Called from BOTH reconcile
+    paths so either feed's settle promotes the event. Returns True on change.
+
+    Deliberately not counted toward ``rows_written``: it is a derived consequence
+    of a feed update already reflected in the tracked-field counts, not a second
+    logical write."""
+    row = conn.execute(
+        "SELECT status, usgs_status, pager_alert, gdacs_is_temporary "
+        "FROM canonical_events WHERE canonical_id = ?", (canonical_id,)
+    ).fetchone()
+    if row is None:
+        return False
+    new_status = _lifecycle_status(
+        row["status"], row["usgs_status"], row["pager_alert"], row["gdacs_is_temporary"]
+    )
+    if new_status == row["status"]:
+        return False
+    conn.execute(
+        "UPDATE canonical_events SET status = ?, last_updated = ? WHERE canonical_id = ?",
+        (new_status, now, canonical_id),
+    )
+    return True
 
 
 def reconcile(conn: sqlite3.Connection, records: list[QuakeRecord], clock: Clock) -> int:
@@ -109,8 +176,9 @@ def reconcile(conn: sqlite3.Connection, records: list[QuakeRecord], clock: Clock
             conn.execute(
                 f"INSERT INTO canonical_events "
                 f"(canonical_id, status, first_seen, last_updated, {', '.join(_TRACKED)}) "
-                f"VALUES (?, 'provisional', ?, ?, {', '.join('?' for _ in _TRACKED)})",
-                (canonical_id, now, now, *(fields[f] for f in _TRACKED)),
+                f"VALUES (?, ?, ?, ?, {', '.join('?' for _ in _TRACKED)})",
+                (canonical_id, config.STATUS_PROVISIONAL, now, now,
+                 *(fields[f] for f in _TRACKED)),
             )
             changed += 1
         elif any(existing[f] != fields[f] for f in _TRACKED):
@@ -123,6 +191,7 @@ def reconcile(conn: sqlite3.Connection, records: list[QuakeRecord], clock: Clock
         # else: identical -> no write (keeps re-runs idempotent).
 
         _link_ids(conn, record.ids, canonical_id)
+        _refresh_status(conn, canonical_id, now)
 
     conn.commit()
     return changed
@@ -196,6 +265,7 @@ def reconcile_gdacs(
             )
             changed += 1
         # else: identical GDACS columns -> no write (keeps re-runs idempotent).
+        _refresh_status(conn, canonical_id, now)
 
     conn.commit()
     return changed
@@ -240,6 +310,9 @@ def _gdacs_target_fields(group: list[GdacsRecord], existing) -> dict[str, object
         "gdacs_episodealertlevel": latest.episodealertlevel,
         "glide": glide,
         "country": country,
+        # Latest episode's settle flag, stored 0/1 so the idempotency comparison
+        # round-trips cleanly through SQLite INTEGER (mirrors the care elsewhere).
+        "gdacs_is_temporary": 0 if not latest.is_temporary else 1,
     }
 
 
@@ -281,7 +354,8 @@ def read_events(conn: sqlite3.Connection) -> list[EventRow]:
     (one row each) regardless of how many feed identifiers point at it.
     """
     rows = conn.execute(
-        "SELECT canonical_id, title, magnitude, place, origin_time, gdacs_episodealertlevel "
+        "SELECT canonical_id, title, magnitude, place, origin_time, "
+        "gdacs_episodealertlevel, status, pager_alert "
         "FROM canonical_events "
         "ORDER BY magnitude DESC NULLS LAST, canonical_id ASC"
     ).fetchall()
@@ -294,6 +368,8 @@ def read_events(conn: sqlite3.Connection) -> list[EventRow]:
             origin_time=row["origin_time"],
             sources=_sources_for(conn, row["canonical_id"]),
             gdacs_episodealertlevel=row["gdacs_episodealertlevel"],
+            status=row["status"],
+            pager_alert=row["pager_alert"],
         )
         for row in rows
     ]

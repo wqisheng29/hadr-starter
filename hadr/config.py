@@ -27,6 +27,34 @@ NEIC_SOURCES: frozenset[str] = frozenset({"neic", "us", "usgs"})
 # latest-episode `gdacs_episodealertlevel`. Compared case-insensitively.
 GDACS_ALERT_RANK: dict[str, int] = {"green": 0, "orange": 1, "red": 2}
 
+# --- Slice 3: provisional -> confirmed lifecycle -------------------------------
+# A quake is recorded PROVISIONAL on first detection and firms to CONFIRMED when
+# an impact signal *settles* in the feed record itself — NO enrichment fetch. The
+# confirming signals (any one is sufficient):
+#   * USGS review status reaches CONFIRMED_USGS_STATUS ("automatic" -> "reviewed"),
+#   * USGS PAGER alert (`properties.alert`, the colour) is non-null,
+#   * GDACS is no longer temporary (`istemporary` == "false"; a settled ShakeMap
+#     flips it off).
+# Confirmation is STICKY: once confirmed an event never regresses to provisional.
+STATUS_PROVISIONAL: str = "provisional"
+STATUS_CONFIRMED: str = "confirmed"
+CONFIRMED_USGS_STATUS: str = "reviewed"
+
+# Material/headline classification. An event is HEADLINE (material) if it is
+# CONFIRMED, or its current severity (GDACS `episodealertlevel` or USGS PAGER
+# `alert`) is one of these levels; otherwise it is ROUTINE and folds below the
+# fold. Compared case-insensitively.
+MATERIAL_ALERT_LEVELS: frozenset[str] = frozenset({"orange", "red"})
+
+# A strong quake headlines on magnitude alone, even while provisional and lacking
+# an impact signal: a potential major event warrants attention before PAGER/GDACS
+# scoring lands (those take ~20-40 min). "Routine" means a *minor* quake near the
+# M4.5 floor, not a large one that simply hasn't been reviewed yet — folding an
+# M6.8 below the fold because it is minutes-old would bury the thing that matters
+# most. This governs DASHBOARD surfacing only; it is NOT an urgent-push trigger
+# (that path stays confirmation-only, no magnitude escape hatch — Slice 4).
+HEADLINE_MIN_MAGNITUDE: float = 6.0
+
 # Default artifact locations, relative to the current working directory.
 DEFAULT_DB_PATH: Path = Path("state/ledger.db")
 DEFAULT_OUT_PATH: Path = Path("dashboard.html")

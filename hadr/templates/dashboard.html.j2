@@ -1,7 +1,9 @@
 {#
-  Slice 1 dashboard. Intentionally minimal but structured: a header with the
-  "as of" line, an optional feed banner, and the events section. Later slices
-  (the "Since the last brief" diff) grow this without a rewrite.
+  Dashboard. A header with the "as of" line, optional feed banners, then the
+  events: material/confirmed quakes are HEADLINED in the main table (each with a
+  provisional/confirmed marker), and routine ones fold into a collapsed summary
+  below the fold (Slice 3). Classification is decided in the briefer from config
+  thresholds — the template only iterates the two lists it is handed.
 #}
 <!DOCTYPE html>
 <html lang="en">
@@ -21,6 +23,17 @@
   th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5b5b57; }
   td.mag { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .empty { color: #5b5b57; font-style: italic; }
+  .tag { font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+         letter-spacing: 0.04em; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+  .tag.provisional { background: #fff3e0; color: #9a5b00; }
+  .tag.confirmed { background: #e6f4ea; color: #1b5e20; }
+  .routine { margin-top: 32px; }
+  .routine h2 { font-size: 0.95rem; color: #5b5b57; margin: 0 0 8px;
+                text-transform: uppercase; letter-spacing: 0.04em; }
+  .routine ul { list-style: none; padding: 0; margin: 0; }
+  .routine li { padding: 4px 0; border-bottom: 1px solid #efeee9;
+                color: #5b5b57; font-size: 0.9rem; }
+  .routine .mag { font-variant-numeric: tabular-nums; color: #1a1a1a; }
 </style>
 </head>
 <body>
@@ -37,15 +50,19 @@
 {% endfor %}
 
 <section class="events">
-{% if events %}
+{% if not events %}
+  <p class="empty">No earthquakes at or above the materiality floor.</p>
+{% else %}
+  {% if headline %}
   <table>
     <thead>
-      <tr><th>Title</th><th>Magnitude</th><th>Place</th><th>Origin time (SGT)</th></tr>
+      <tr><th>Title</th><th>Status</th><th>Magnitude</th><th>Place</th><th>Origin time (SGT)</th></tr>
     </thead>
     <tbody>
-    {% for e in events %}
+    {% for e in headline %}
       <tr>
         <td>{{ e.title if e.title is not none else "—" }}{% if e.sources|length > 1 %} <span style="font-size:0.7rem; color:#5b5b57; white-space:nowrap;">{{ e.sources_label }}</span>{% endif %}{% if e.gdacs_alert %} <span style="font-size:0.7rem; font-weight:600; color:{{ e.gdacs_alert_colour }};">{{ e.gdacs_alert }}</span>{% endif %}</td>
+        <td>{% if e.is_confirmed %}<span class="tag confirmed">confirmed</span>{% else %}<span class="tag provisional">provisional</span>{% endif %}</td>
         <td class="mag">{{ "M%.1f"|format(e.magnitude) if e.magnitude is not none else "—" }}</td>
         <td>{{ e.place if e.place is not none else "—" }}</td>
         <td title="{{ e.origin_utc }}">{{ e.origin_sgt }}</td>
@@ -53,8 +70,20 @@
     {% endfor %}
     </tbody>
   </table>
-{% else %}
-  <p class="empty">No earthquakes at or above the materiality floor.</p>
+  {% else %}
+  <p class="empty">No material earthquakes right now.</p>
+  {% endif %}
+
+  {% if routine %}
+  <section class="routine">
+    <h2>Routine / ongoing ({{ routine|length }})</h2>
+    <ul>
+    {% for e in routine %}
+      <li><span class="mag">{{ "M%.1f"|format(e.magnitude) if e.magnitude is not none else "—" }}</span> {{ e.title if e.title is not none else "—" }} — {{ e.place if e.place is not none else "—" }} <span class="tag {% if e.is_confirmed %}confirmed{% else %}provisional{% endif %}">{{ e.status }}</span></li>
+    {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
 {% endif %}
 </section>
 </body>

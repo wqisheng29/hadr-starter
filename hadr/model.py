@@ -28,6 +28,11 @@ class QuakeRecord:
     longitude: float
     latitude: float
     depth_km: float | None
+    # Lifecycle signals carried natively by the feed (Slice 3). ``status`` is the
+    # USGS review state ("automatic"/"reviewed"); ``pager_alert`` is the PAGER
+    # colour (``properties.alert``), null until PAGER has run.
+    status: str | None = None
+    pager_alert: str | None = None
 
     @property
     def origin_time_utc(self) -> datetime:
@@ -67,6 +72,10 @@ class GdacsRecord:
     longitude: float | None
     latitude: float | None
     depth_km: float | None
+    # ``istemporary`` parsed to bool (Slice 3): a temporary (pre-ShakeMap) alert
+    # is not yet settled. Missing/unknown defaults to True (conservative: treat an
+    # alert we can't read as still-provisional). A settled ShakeMap flips it off.
+    is_temporary: bool = True
 
     @property
     def origin_time_utc(self) -> datetime:
@@ -163,6 +172,11 @@ class EventRow:
     origin_time: str | None  # ISO8601 UTC
     sources: tuple[str, ...] = ()
     gdacs_episodealertlevel: str | None = None
+    # Lifecycle status ("provisional"/"confirmed") and the USGS PAGER colour, both
+    # used by the briefer to headline material/confirmed events and fold routine
+    # ones (Slice 3). Classification thresholds live in ``config``, not here.
+    status: str | None = None
+    pager_alert: str | None = None
 
 
 @dataclass(frozen=True)
