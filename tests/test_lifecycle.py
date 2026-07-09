@@ -55,8 +55,10 @@ def test_new_automatic_null_pager_is_provisional(
     # Hualien ships as status=reviewed in the same fixture -> already confirmed.
     assert _status(tmp_ledger, "usgs:us7000efgh") == "confirmed"
 
-    # A provisional read is never presented as settled.
-    assert "provisional" in tmp_out.read_text()
+    # A provisional read is never presented as settled: at least one row carries
+    # the rendered provisional tag. (Assert the row markup, not the bare word —
+    # the CSS block always mentions both tag classes.)
+    assert 'class="tag provisional"' in tmp_out.read_text()
 
 
 # --- USGS automatic -> reviewed promotes --------------------------------------
@@ -66,11 +68,17 @@ def test_usgs_automatic_to_reviewed_promotes(
 ):
     run(fixture_source("lifecycle_provisional.json"), frozen_clock, tmp_ledger, tmp_out)
     assert _status(tmp_ledger, _TESTVILLE) == "provisional"
-    assert "provisional" in tmp_out.read_text()
+    # Single event, provisional: its rendered row tag is provisional, not confirmed.
+    html = tmp_out.read_text()
+    assert 'class="tag provisional"' in html
+    assert 'class="tag confirmed"' not in html
 
     run(fixture_source("lifecycle_reviewed.json"), frozen_clock, tmp_ledger, tmp_out)
     assert _status(tmp_ledger, _TESTVILLE) == "confirmed"
-    assert "confirmed" in tmp_out.read_text()
+    # The very same event now renders the confirmed tag, and no provisional one.
+    html = tmp_out.read_text()
+    assert 'class="tag confirmed"' in html
+    assert 'class="tag provisional"' not in html
 
 
 # --- USGS PAGER null -> non-null promotes -------------------------------------
@@ -242,6 +250,7 @@ def test_strong_provisional_quake_headlines_on_magnitude(
     html = tmp_out.read_text()
 
     assert _status(tmp_ledger, _PADANG) == "provisional"
+    assert 'class="routine"' in html
     headline_part, routine_part = html.split('class="routine"', 1)
     assert "120 km SW of Padang, Indonesia" in headline_part   # strong -> headlined
     assert "9 km NNE of Avalon, CA" in routine_part            # minor -> folded
