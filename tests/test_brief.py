@@ -19,8 +19,8 @@ import pytest
 
 from hadr.brief import write_brief
 from hadr.clock import FrozenClock
-from hadr.fetch import FixtureFeedSource
-from hadr.ledger import connect
+from hadr.fetch import RELIEFWEB_SOURCE, USGS_SOURCE, FixtureFeedSource
+from hadr.ledger import connect, reconcile_absences
 from hadr.model import FetchOutcome
 from hadr.pipeline import run
 
@@ -263,6 +263,44 @@ def test_unreachable_feed_does_not_mark_absence(env):
         "SELECT status FROM canonical_events WHERE canonical_id = 'gdacs:EQ:1560500'"
     ).fetchone()["status"] == "confirmed"   # untouched, not retracted
     conn.close()
+
+
+def test_reliefweb_disappearance_is_never_a_retraction(env):
+    # PRD Q5 / Slice-5 DoD: a vanished ReliefWeb RSS item is "aged-out unless
+    # corroborated, never a retraction" — because the tick never re-polls
+    # ReliefWeb, its absence can imply no withdrawal. Only USGS/GDACS (the polled
+    # feeds) can. Here an event vouched ONLY by ReliefWeb sits WITHIN the feed
+    # windows (fresh origin), so if ReliefWeb were treated as pollable it would be
+    # RETRACTED; the source type, not the age, is what must spare it. Built at the
+    # ledger seam because the pipeline never mints a ReliefWeb-only event.
+    now = _DAY2.now()
+    conn = connect(env["db"])
+    try:
+        conn.execute(
+            "INSERT INTO canonical_events "
+            "(canonical_id, status, first_seen, last_updated, origin_time) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("reliefweb:rw-only", "confirmed", now.isoformat(), now.isoformat(),
+             now.isoformat()),   # within-window: age is not the reason it survives
+        )
+        conn.execute(
+            "INSERT INTO feed_identifiers (source, feed_id, canonical_id) "
+            "VALUES (?, ?, ?)",
+            (RELIEFWEB_SOURCE, "rw-1", "reliefweb:rw-only"),
+        )
+        conn.commit()
+
+        # The item is gone this run (not in ``seen``) and USGS was reachable, yet
+        # the sole vouching feed (ReliefWeb) is not pollable -> no state change.
+        changed = reconcile_absences(
+            conn, seen=set(), reachable_sources={USGS_SOURCE}, clock=_DAY2)
+
+        assert changed == 0
+        assert conn.execute(
+            "SELECT status FROM canonical_events WHERE canonical_id = 'reliefweb:rw-only'"
+        ).fetchone()["status"] == "confirmed"   # never retracted, never aged-out
+    finally:
+        conn.close()
 
 
 # --- CLI wiring (mirrors tests/test_run_cli.py) -------------------------------
