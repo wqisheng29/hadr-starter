@@ -119,8 +119,11 @@ def main(argv: list[str] | None = None) -> int:
 
     for attempt in range(1, args.retries + 1):
         # Rebase our commit on top of anything the other scheduler pushed since
-        # checkout (disjoint paths -> no conflict), then push.
-        rebase = _run(["git", "pull", "--rebase"])
+        # checkout (disjoint paths -> no conflict), then push. autostash is
+        # defense-in-depth: an unowned dirty file left by the caller (e.g. a tick
+        # that rendered a dashboard it does not commit) would otherwise make rebase
+        # refuse ("cannot pull with rebase: you have unstaged changes").
+        rebase = _run(["git", "-c", "rebase.autostash=true", "pull", "--rebase"])
         if rebase.returncode != 0:
             print(f"✗ git pull --rebase failed (attempt {attempt}): {rebase.stderr.strip()}",
                   file=sys.stderr)
