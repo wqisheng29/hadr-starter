@@ -130,6 +130,8 @@ def _parse_feature(feature: object) -> QuakeRecord:
         longitude=float(coords[0]),
         latitude=float(coords[1]),
         depth_km=_maybe_float(coords[2]) if len(coords) > 2 else None,
+        status=props.get("status"),
+        pager_alert=props.get("alert"),
     )
 
 
@@ -211,7 +213,15 @@ def _parse_gdacs_feature(feature: dict) -> GdacsRecord:
         longitude=float(coords[0]) if len(coords) > 0 else None,
         latitude=float(coords[1]) if len(coords) > 1 else None,
         depth_km=_maybe_float(coords[2]) if len(coords) > 2 else None,
+        is_temporary=_gdacs_is_temporary(props.get("istemporary")),
     )
+
+
+def _gdacs_is_temporary(value: object) -> bool:
+    """Parse GDACS ``istemporary`` ("true"/"false" string) to bool. Missing or
+    unrecognised -> True (temporary), the conservative "not yet settled" default;
+    only an explicit "false" marks a settled (no-longer-temporary) alert."""
+    return value is None or str(value).strip().lower() != "false"
 
 
 def _gdacs_time_ms(value: object) -> int:
