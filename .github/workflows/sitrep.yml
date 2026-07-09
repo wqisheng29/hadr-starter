@@ -40,9 +40,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -69,7 +69,7 @@ jobs:
           grep -q "SGT" public/index.html || { echo "::error::sitrep is missing its 'as of … SGT' line — likely a failed run"; exit 1; }
 
       - name: Upload the sitrep as the Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: public
 
@@ -82,4 +82,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
