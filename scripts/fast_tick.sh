@@ -16,9 +16,11 @@
 #      commit helper (disjoint paths + pull --rebase + retry so it never clobbers
 #      the brief's dashboard/snapshot commits).
 #
-# The tick also renders dashboard.html locally, but does NOT commit it — the
-# 08:30 brief is the canonical writer of the committed dashboard (single-writer;
-# see config.BRIEF_COMMIT_PATHS). On this cloud agent that render is ephemeral.
+# The tick renders to an EPHEMERAL, git-ignored path — NOT the tracked
+# dashboard.html. The 08:30 brief is the canonical writer of the committed
+# dashboard (single-writer; see config.BRIEF_COMMIT_PATHS). Rendering onto the
+# tracked file would leave the working tree dirty and make the tick's own
+# `git pull --rebase` abort, silently dropping the ledger commit.
 #
 # Secrets live in the agent environment (ADR-0005), never in the repo.
 set -euo pipefail
@@ -33,7 +35,10 @@ if [ -f .venv/bin/activate ]; then
 fi
 
 DB="${HADR_DB:-state/ledger.db}"
-OUT="${HADR_OUT:-dashboard.html}"
+# Ephemeral, git-ignored render path (reports/ is ignored) so the tick never
+# dirties the tracked, brief-owned dashboard.html and its rebase-push can proceed.
+OUT="${HADR_OUT:-reports/tick-dashboard.html}"
+mkdir -p "$(dirname "$OUT")"
 
 python scripts/run.py --live --db "$DB" --out "$OUT"
 
