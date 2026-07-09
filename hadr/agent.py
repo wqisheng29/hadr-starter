@@ -24,6 +24,12 @@ from .tools import ToolRegistry
 
 DEFAULT_MAX_STEPS = 8
 
+# Agent turns need far more headroom than a one-shot reply: a reasoning model
+# spends hundreds of tokens thinking, then has to emit a write_dashboard call
+# carrying an assessment per event. The llm default (2048) truncated that call
+# mid-turn in production; 8192 leaves room to finish it.
+DEFAULT_MAX_TOKENS = 8192
+
 
 @dataclass(frozen=True)
 class ToolInvocation:
@@ -51,18 +57,22 @@ def run_agent(
     registry: ToolRegistry,
     *,
     max_steps: int = DEFAULT_MAX_STEPS,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
     on_tool: Callable[[ToolInvocation], None] | None = None,
 ) -> AgentResult:
     """Drive the model/tool loop until a plain-text reply or the step guard.
 
-    ``on_tool`` (optional) is called as each tool finishes, so a CLI can show
-    activity live instead of only after the whole turn returns.
+    ``max_tokens`` is the per-call budget passed to the model; it defaults high
+    (``DEFAULT_MAX_TOKENS``) because a reasoning model needs room to think *and*
+    emit its tool call in one turn. ``on_tool`` (optional) is called as each tool
+    finishes, so a CLI can show activity live instead of only after the whole
+    turn returns.
     """
     tools_schema = registry.schema()
     invocations: list[ToolInvocation] = []
 
     for step in range(1, max_steps + 1):
-        result = model.complete(messages, tools=tools_schema)
+        result = model.complete(messages, tools=tools_schema, max_tokens=max_tokens)
         if not result.ok:
             return AgentResult(
                 ok=False, error=result.error, steps=step, invocations=tuple(invocations)

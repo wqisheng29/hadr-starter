@@ -93,6 +93,34 @@ Kept by the agent, reviewed by you. One entry per working block.
   (4) `complete()` coerces null content to `""` so a reply is never `None`.
   `--as-of` parse errors now exit cleanly instead of a traceback.
 
+### Agent-loop reliability — fixing the empty morning run (9 Jul 2026)
+
+The first live GitHub Actions run failed: the agent called `fetch_feed` (248
+live events), then emitted a "let me assess and write the dashboard" preamble
+and **stopped without calling `write_dashboard`** — no file, and the workflow's
+publish gate correctly failed the job. Root cause was two compounding things: a
+reasoning model (`glm-5.2`) was handed all 248 events *and* the default 2048
+token budget, so it exhausted the budget on reasoning + preamble and truncated
+(`finish_reason=length`) before it could emit the tool call. Fixes:
+
+- **`fetch_feed` filters to material events at the seam.** It now drops events
+  below `config.MIN_MAGNITUDE` and returns them strongest-first, with a
+  `total_before_floor` count. Fewer, ordered events mean less reasoning and a
+  smaller tool call — and it is a correctness win (the model no longer wades
+  through ~250 sub-M2.5 records). See the deviation note below.
+- **Agent token budget raised to 8192** (`agent.DEFAULT_MAX_TOKENS`), threaded
+  through `run_agent(max_tokens=...)` and a new `scripts/agent.py --max-tokens`
+  flag. The llm default (2048) stays — it is right for the one-shot smoke test;
+  agent turns need room to think *and* emit a tool call.
+- **Truncation guard broadened** (`llm.py`): a `finish_reason=length` turn with
+  no tool calls is now a failure even when its content is non-empty (previously
+  only empty content tripped it), so a truncated preamble can never be mistaken
+  for the final answer. The agent loop now stops loudly instead of silently
+  producing no dashboard.
+- **System prompt** updated to say `fetch_feed` returns pre-filtered material
+  events and that calling `write_dashboard` is mandatory (invoke it, don't
+  narrate it), including the zero-material-events case.
+
 ## Open questions
 
 ## Deviations
@@ -123,6 +151,14 @@ Kept by the agent, reviewed by you. One entry per working block.
   *by* 08:30. The natural migration back to the ADR-0005 scheduler (or an
   always-on host) is unaffected — the workflow just shells out to
   `scripts/agent.py`.
+- **`fetch_feed` applies the materiality floor, not just the model's prose.**
+  The agent slice originally left filtering to the model (system prompt), but a
+  reasoning model handed ~250 events truncated before writing the dashboard (see
+  "Agent-loop reliability" above). `fetch_feed` now drops sub-floor events at the
+  seam using `config.MIN_MAGNITUDE`, returning material events strongest-first
+  plus `total_before_floor`. This honours "thresholds in config, not prose"
+  (CLAUDE.md) and does not change the deterministic pipeline, which already
+  applied the floor independently.
 - **Sitrep is published to GitHub Pages, never committed.** The agent's output
   stays git-ignored (`reports/`), honouring the "agent output is not the
   committed `dashboard.html`" decision above: the workflow writes it to

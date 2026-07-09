@@ -37,6 +37,19 @@ def test_fetch_feed_returns_normalised_events(fixture_source):
     assert {"id", "magnitude", "place", "title", "origin_time_utc"} <= first.keys()
 
 
+def test_fetch_feed_drops_sub_floor_and_sorts_strongest_first(fixture_source):
+    # all_day.json holds M6.8, 5.1, 4.5, 3.0 and a null-magnitude record. With
+    # the M4.5 floor, only the first three survive, strongest-first, and the
+    # noise the model never needs to see (M3.0 + null) is screened out.
+    tool = fetch_feed_tool({"usgs": fixture_source("all_day.json")})
+    out = json.loads(tool.handler({"source": "usgs"}))
+    mags = [e["magnitude"] for e in out["events"]]
+    assert mags == [6.8, 5.1, 4.5]              # filtered and sorted descending
+    assert out["count"] == 3
+    assert out["min_magnitude"] == 4.5
+    assert out["total_before_floor"] == 5       # so the model can report absence honestly
+
+
 def test_fetch_feed_defaults_source_when_omitted(fixture_source):
     tool = fetch_feed_tool({"usgs": fixture_source("all_day.json")})
     assert json.loads(tool.handler({}))["ok"]  # source defaults to usgs

@@ -28,7 +28,7 @@ from datetime import datetime
 from pathlib import Path
 
 from hadr import config, llm
-from hadr.agent import ToolInvocation, run_agent
+from hadr.agent import DEFAULT_MAX_TOKENS, ToolInvocation, run_agent
 from hadr.clock import FrozenClock, SystemClock
 from hadr.fetch import FixtureFeedSource, HttpFeedSource
 from hadr.tools import ToolRegistry, fetch_feed_tool, write_dashboard_tool
@@ -50,6 +50,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                         help="freeze the clock (e.g. 2026-07-08T00:30:00Z) so the dashboard is reproducible")
     parser.add_argument("--max-steps", type=int, default=8,
                         help="max model/tool round-trips per user turn (default %(default)s)")
+    parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS,
+                        help="per-call token budget; a reasoning model needs room to "
+                             "think and still emit its tool call (default %(default)s)")
     parser.add_argument("--prompt", help="a single user message to send")
     parser.add_argument("--once", action="store_true",
                         help="send --prompt (or one stdin line) and exit, without an interactive loop")
@@ -71,9 +74,10 @@ def _print_tool(inv: ToolInvocation) -> None:
     print(f"  → {inv.name}({args})", file=sys.stderr)
 
 
-def _turn(model, messages, registry, max_steps: int) -> None:
+def _turn(model, messages, registry, max_steps: int, max_tokens: int) -> None:
     """Run one user turn and print the reply (and any failure) to the user."""
-    result = run_agent(model, messages, registry, max_steps=max_steps, on_tool=_print_tool)
+    result = run_agent(model, messages, registry, max_steps=max_steps,
+                       max_tokens=max_tokens, on_tool=_print_tool)
     if result.ok:
         print(f"\n{result.reply}\n")
     else:
@@ -121,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             print("✗ nothing to send (use --prompt or pipe a line in)", file=sys.stderr)
             return 2
         messages.append({"role": "user", "content": user})
-        _turn(model, messages, registry, args.max_steps)
+        _turn(model, messages, registry, args.max_steps, args.max_tokens)
         return 0
 
     # Interactive chat loop: read, append, run the agent, print, repeat.
@@ -137,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         if not user:
             continue
         messages.append({"role": "user", "content": user})
-        _turn(model, messages, registry, args.max_steps)
+        _turn(model, messages, registry, args.max_steps, args.max_tokens)
     return 0
 
 

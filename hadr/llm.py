@@ -154,15 +154,19 @@ class OpenCodeChatModel:
         if raw_tool_calls:
             assistant_message["tool_calls"] = raw_tool_calls
 
-        # Reasoning models (e.g. glm-5.2) burn max_tokens on hidden reasoning
-        # before emitting content; a too-small budget yields HTTP 200 with an
-        # empty reply. That is a failure, not an answer — unless the model spent
-        # the turn asking for tools, in which case empty content is expected.
-        if not content and not tool_calls and choice.get("finish_reason") == "length":
+        # A turn cut off by the token cap is not a completed turn. Reasoning
+        # models (e.g. glm-5.2) burn max_tokens on hidden reasoning first, so a
+        # too-small budget yields finish_reason="length" with either empty
+        # content or just a preamble sentence — and, crucially, no tool call it
+        # was about to make. Treat any length-truncation with no tool_calls as a
+        # failure so the agent loop stops loudly instead of accepting the stub as
+        # its final answer. (When there *are* tool_calls, empty/partial content
+        # is expected and the loop proceeds to run them.)
+        if not tool_calls and choice.get("finish_reason") == "length":
             return ChatResult(
                 ok=False,
-                error="empty reply: max_tokens exhausted by reasoning before any "
-                "content (finish_reason=length) — raise max_tokens",
+                error="reply truncated: max_tokens exhausted before the turn "
+                "completed (finish_reason=length) — raise max_tokens",
                 message=assistant_message,
             )
 

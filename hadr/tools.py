@@ -22,6 +22,7 @@ from pathlib import Path
 
 from jinja2 import Environment, PackageLoader
 
+from . import config
 from .clock import Clock, format_sgt
 from .fetch import FeedSource, parse_usgs
 from .llm import ToolCall
@@ -99,13 +100,26 @@ def _err(message: str) -> str:
 # --- fetch_feed ---------------------------------------------------------------
 
 
-def fetch_feed_tool(sources: dict[str, FeedSource]) -> Tool:
-    """A tool that fetches a HADR feed and returns normalised events as JSON.
+def fetch_feed_tool(
+    sources: dict[str, FeedSource],
+    min_magnitude: float = config.MIN_MAGNITUDE,
+) -> Tool:
+    """A tool that fetches a HADR feed and returns its *material* events as JSON.
 
     ``sources`` maps a feed name (e.g. ``"usgs"``) to an injected ``FeedSource``
     — a fixture in tests, live HTTP in production. The raw feed body is parsed
     into compact records so the model reasons over a small, uniform list instead
     of a page of GeoJSON.
+
+    Events below ``min_magnitude`` (config's materiality floor) are dropped here,
+    at the seam, rather than left for the model to filter in prose. USGS
+    ``all_day`` is mostly sub-M2.5 noise — ~250 records on a busy day — and
+    dumping all of it on the model both buries the few quakes that matter and,
+    with a reasoning model, exhausts the token budget before it can call
+    ``write_dashboard`` (the failure this filtering fixes). The floor is a config
+    value, not the model's judgement (CLAUDE.md: thresholds in config, not
+    prose); the result carries ``total_before_floor`` so the model can still say
+    how much was screened out and never read absence as safety.
     """
 
     def handler(args: dict) -> str:
@@ -123,6 +137,14 @@ def fetch_feed_tool(sources: dict[str, FeedSource]) -> Tool:
         if not parsed.ok:
             return json.dumps({"ok": False, "source": name, "error": parsed.error})
 
+        # Keep only material events, strongest first. A null magnitude sorts as
+        # below the floor (dropped), consistent with the deterministic pipeline.
+        material = sorted(
+            (r for r in parsed.records
+             if r.magnitude is not None and r.magnitude >= min_magnitude),
+            key=lambda r: r.magnitude,
+            reverse=True,
+        )
         events = [
             {
                 "id": r.preferred_id,
@@ -131,18 +153,28 @@ def fetch_feed_tool(sources: dict[str, FeedSource]) -> Tool:
                 "title": r.title,
                 "origin_time_utc": r.origin_time_utc.isoformat(),
             }
-            for r in parsed.records
+            for r in material
         ]
         return json.dumps(
-            {"ok": True, "source": name, "count": len(events), "events": events}
+            {
+                "ok": True,
+                "source": name,
+                "count": len(events),
+                "min_magnitude": min_magnitude,
+                "total_before_floor": len(parsed.records),
+                "events": events,
+            }
         )
 
     return Tool(
         name="fetch_feed",
         description=(
-            "Fetch a humanitarian disaster feed and return its current events as "
-            "normalised JSON (id, magnitude, place, title, origin_time_utc). Call "
-            "this before assessing or writing a dashboard."
+            "Fetch a humanitarian disaster feed and return its material events as "
+            "normalised JSON (id, magnitude, place, title, origin_time_utc), "
+            f"already filtered to magnitude >= {min_magnitude} and sorted "
+            "strongest-first. 'total_before_floor' reports how many events were "
+            "seen before the floor was applied. Call this before assessing or "
+            "writing a dashboard."
         ),
         parameters={
             "type": "object",

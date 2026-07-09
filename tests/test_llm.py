@@ -71,6 +71,20 @@ def test_empty_reply_truncated_by_reasoning_is_an_error():
     assert not result.ok and "max_tokens" in result.error
 
 
+def test_truncated_preamble_without_tool_calls_is_an_error():
+    # The production failure: the model emitted a "let me write the dashboard"
+    # preamble, hit the token cap (finish_reason=length) before making the tool
+    # call, and stopped. Non-empty content must not mask a truncated turn.
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{
+            "message": {"content": "Let me assess the material ones and write the dashboard."},
+            "finish_reason": "length",
+        }]})
+
+    result = _model(handler).complete([{"role": "user", "content": "x"}], max_tokens=32)
+    assert not result.ok and "max_tokens" in result.error
+
+
 def test_empty_reply_without_truncation_is_still_ok():
     # An empty string the model chose to return (finish_reason=stop) is a valid
     # answer — only length-truncation makes emptiness a failure.
