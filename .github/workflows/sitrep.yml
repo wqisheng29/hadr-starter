@@ -1,0 +1,85 @@
+name: Morning sitrep
+
+# Daily HADR earthquake situation report, published to GitHub Pages in time for
+# the 08:30 SGT morning brief.
+#
+# Timezone: GitHub Actions cron is UTC. Singapore is a fixed UTC+8 (no DST), so
+# 08:30 SGT == 00:30 UTC. Scheduled runs are frequently delayed several minutes
+# under load, so we fire at 00:00 UTC (08:00 SGT) to leave a ~30-minute buffer —
+# the report is reliably ready *by* 08:30, not racing it. The report's own
+# "as of" line is stamped from the real run time in SGT (SystemClock).
+#
+# Shape (per the retired sitrep.yml scaffold + ADR-0001): the deterministic
+# scheduler (cron) decides when to wake; the model only does the assessment. The
+# model never decides whether to run.
+#
+# Requires one repository secret: OPENCODE_API_KEY (Settings → Secrets and
+# variables → Actions). Scheduled runs only fire from the default branch, so this
+# file must be on main to run on a cron; workflow_dispatch works once it is there.
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 00:00 UTC daily == 08:00 SGT (buffer before the 08:30 brief)
+  workflow_dispatch: {} # allow a manual run from the Actions tab
+
+# Least privilege: read the repo, and what Pages deployment needs. No write to
+# repo contents — the agent's sitrep is published to Pages, never committed
+# (implementation-notes.md: agent output is not the committed dashboard.html).
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two publishes at once; let an in-flight deploy finish rather than
+# cancelling it (a half-deployed dashboard is worse than a slightly late one).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Generate the morning sitrep
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          python scripts/agent.py --once \
+            --out public/index.html \
+            --prompt "Produce today's 08:30 SGT earthquake situation report: fetch the USGS feed, assess the material events per your standing orders, and write the dashboard."
+
+      - name: Verify a report was produced
+        # scripts/agent.py exits 0 even when the model or a tool fails (it prints
+        # the failure to stderr and returns), so gate the publish on a real,
+        # non-empty artifact rather than trusting the exit code.
+        run: |
+          test -s public/index.html || { echo "::error::no sitrep was written — the agent run failed"; exit 1; }
+          grep -q "SGT" public/index.html || { echo "::error::sitrep is missing its 'as of … SGT' line — likely a failed run"; exit 1; }
+
+      - name: Upload the sitrep as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

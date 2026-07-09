@@ -112,6 +112,25 @@ Kept by the agent, reviewed by you. One entry per working block.
   `dashboard.html` is still committed (it is the product).
 - **Reconcile is insert/update-only.** A quake absent from a later fetch is left
   as-is, never deleted — retraction/aged-out status is deliberately slice 3+.
+- **Morning sitrep runs on GitHub Actions, not the harness's cloud scheduler.**
+  ADR-0005 chose the harness's own routines/cron agents for deployment.
+  `.github/workflows/sitrep.yml` uses a GitHub Actions `schedule` instead,
+  because the operator asked for it and the repo already shipped an Actions
+  scaffold (`sitrep.yml.disabled`, now retired). Only the daily 08:30 briefing
+  is wired here; the ~30-min poll+triage tick from ADR-0005 is not. Timezone:
+  cron is UTC and SGT is a fixed UTC+8, so 08:30 SGT == 00:30 UTC; the job fires
+  at 00:00 UTC (08:00 SGT) to absorb Actions' scheduling latency and be ready
+  *by* 08:30. The natural migration back to the ADR-0005 scheduler (or an
+  always-on host) is unaffected — the workflow just shells out to
+  `scripts/agent.py`.
+- **Sitrep is published to GitHub Pages, never committed.** The agent's output
+  stays git-ignored (`reports/`), honouring the "agent output is not the
+  committed `dashboard.html`" decision above: the workflow writes it to
+  `public/index.html` and deploys via `upload-pages-artifact`/`deploy-pages`, so
+  nothing lands in git history. The publish is gated on a non-empty artifact
+  containing the "as of … SGT" line, because `scripts/agent.py --once` exits 0
+  even when the model/tool fails (it reports failures to stderr, not via the
+  exit code) — the workflow check is the compensating gate.
 - **Autoescape bug fixed (was a latent stored-XSS).** CLAUDE.md requires
   "autoescape on for any third-party feed text rendered into HTML," and both
   `briefer.py` and the new `tools.py` used `select_autoescape()`. But its default
