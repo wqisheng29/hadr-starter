@@ -1,0 +1,40 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          100.1,
+          -0.5
+        ]
+      },
+      "properties": {
+        "eventtype": "EQ",
+        "eventid": 1560500,
+        "episodeid": 1730500,
+        "glide": "",
+        "name": "Earthquake near West Sumatra, Indonesia",
+        "alertlevel": "Green",
+        "alertscore": 0.8,
+        "episodealertlevel": "Green",
+        "episodealertscore": 0.8,
+        "istemporary": "false",
+        "iscurrent": "true",
+        "country": "Indonesia",
+        "iso3": "IDN",
+        "fromdate": "2026-07-07T22:30:00",
+        "todate": "2026-07-07T22:30:00",
+        "datemodified": "2026-07-07T22:30:00",
+        "source": "GFZ",
+        "sourceid": "gfz1560500",
+        "severitydata": {
+          "severity": 6.2,
+          "severitytext": "Magnitude 6.2M",
+          "severityunit": "M"
+        }
+      }
+    }
+  ]
+}
