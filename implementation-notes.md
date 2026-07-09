@@ -341,7 +341,49 @@ byte-unchanged):
   with `--model`/`--reliefweb`/`--link-decisions-out` for the judgement layer, and
   restates the honesty rules.
 
+### Slice 7 — unattended operation (change-gated 08:30 brief + fast-tick scaffold)
+
+- **The deterministic change-gate** (`hadr/gate.py` + `scripts/change_gate.py`) is
+  the load-bearing decision: does the 08:30 brief have anything MATERIAL to
+  republish? It calls NO model and touches NO network — a thin, READ-ONLY reuse of
+  Slice 5's diff. It reads the current ledger (SQLite `mode=ro`), loads the last
+  published snapshot, computes `build_diff`, and returns
+  `Diff.has_material_change`. The model never decides whether to wake (ADR-0001/2).
+  Deterministic under an injected clock: same ledger + frozen clock + same prior
+  snapshot ⇒ same verdict. It is decoupled from `brief.py` on purpose (Slice 6
+  owns that file) — it re-derives the diff from public `ledger.read_events` +
+  `diff.build_diff`, and never imports the brief's internals.
+- **Two branchable outputs.** The gate CLI writes `changed=true|false` to
+  `$GITHUB_OUTPUT` (the workflow branches on it, so the publish step is *visibly
+  skipped* on a no-change run), and with `--exit-code` returns 0/1 for shell
+  chaining. Default exit is 0 so the workflow step itself always succeeds and the
+  branch is on the output flag.
+- **The 08:30 brief workflow** (`.github/workflows/sitrep.yml`) has both steps
+  filled: (1) the deterministic gate; (2) a guarded publish (`if:
+  steps.gate.outputs.changed == 'true'`) invoking `scripts/brief.py`, plus a
+  guarded commit. `concurrency: group: morning-sitrep` guards the brief;
+  `workflow_dispatch` runs green end-to-end (with a committed `dashboard.html` and
+  no ledger yet, the gate says no-change and the publish is skipped — still green).
+- **Single-writer commit coordination** (`scripts/commit_state.py`). Owned-path
+  policy lives in `config.py` (`TICK_COMMIT_PATHS` = `state/ledger.db`;
+  `BRIEF_COMMIT_PATHS` = `dashboard.html` + `state/published`). The pure decision
+  (`paths_for_role` / `should_commit`) is unit-tested without real git; the impure
+  `main` stages only the changed owned paths, commits only on change, then `git
+  pull --rebase` + retries the push. Because the two writers own DISJOINT paths, a
+  rebase can never conflict on the binary ledger.
+- **Fast/urgent tick** (`scripts/fast_tick.sh`) is a documented wrapper for the
+  ~30-min harness cloud agent (NOT a GitHub Action — the native push needs the
+  agent context, ADR-0005). It shells out to `scripts/run.py` (which fires the
+  Slice-4 urgent push via the injected sink) then commits `ledger.db` on change.
+- **`state/` is now committed** (`.gitignore`): the blanket `state/` ignore is
+  replaced by ignoring only SQLite sidecars, per ADR-0006 now that the commit
+  coordination exists.
+
 ## Open questions
+
+- **No production push sink is wired into `scripts/run.py` yet** (carried over from
+  Slice 4). `fast_tick.sh` documents where the harness native push attaches, but
+  the sink→harness binding is left to the agent-environment setup, not code here.
 
 ## Deviations
 
@@ -368,16 +410,54 @@ byte-unchanged):
   when `--model` is on (a keyless deterministic brief writes no decisions file and
   touches no extra paths).
 - **Slice 6: `apply_link_decisions` makes a linked ReliefWeb id show up in an
-  event's `sources`** (via `_sources_for`, which already excludes only GLIDE). This
-  is intended — ReliefWeb corroborates — and never triggers a false absence-mark,
-  because `reconcile_absences` requires ALL of an event's sources reachable and
-  ReliefWeb is never fetched (never in `reachable`), so such events are simply left
-  alone (conservative). No existing test links ReliefWeb, so none is affected.
+  event's `sources`** (via `_sources_for`, which excludes only GLIDE) — intended,
+  ReliefWeb corroborates. It does NOT pin the event active: after review,
+  `reconcile_absences` bases its liveness decision only on tick-POLLED feeds
+  (usgs/gdacs), treating ReliefWeb (never re-fetched by a tick) as context, so an
+  enriched event still ages out / retracts normally on its pollable feeds. (An
+  earlier draft required ALL sources reachable, which silently made any
+  ReliefWeb-linked event immortal — caught by review, fixed, regression-tested.)
 - **Slice 6: `brief.py` imports `briefer._is_material`** (a leading-underscore
   helper) to classify which events get an impact basis, rather than duplicating the
   materiality rule. Reuse over a copy keeps the single config-driven definition
   authoritative; the alternative was to promote it to a public name, deferred to
   avoid touching Slice 3's surface.
+- **Slice 7: the gate compares STATE, not rendered HTML.** The DoD language
+  "treat 'dashboard.html would differ' as change" is implemented as a state diff
+  (`Diff.has_material_change`) plus a bootstrap check (a *missing* dashboard
+  artifact counts as change), NOT a byte comparison of rendered HTML. Rendering
+  and comparing bytes would always differ — the brief stamps a per-run "as of"
+  line, and Slice 6 adds model prose — which would both make the gate fire every
+  run and drag a model into a decision that must be model-free. Comparing the
+  brief-relevant state is the deterministic, model-free reading.
+- **Slice 7: the cron is `30 0 * * *` (00:30 UTC = 08:30 SGT exactly), replacing
+  the Slice-1 sitrep scaffold's 00:00-UTC buffer.** Issue #10's DoD fixes the cron
+  at 08:30 SGT; the old workflow fired early (08:00 SGT) to absorb Actions'
+  scheduling latency. The DoD's explicit cron wins; the change-gate also makes an
+  occasional late run cheap (a no-change wake does no model work), so the buffer is
+  less needed.
+- **Slice 7: `sitrep.yml` is repurposed from a model-writes-to-Pages workflow to a
+  gate-then-deterministic-brief-commit workflow.** The prior workflow ran
+  `scripts/agent.py` and published to GitHub Pages (never committed). Slice 7's DoD
+  makes the brief the canonical committed writer of `dashboard.html` (single-writer
+  coordination), so the workflow now commits its disjoint paths with `GITHUB_TOKEN`
+  (`permissions: contents: write`) instead of deploying to Pages. Slice 6 layers
+  the LLM into `scripts/brief.py` behind the same guarded entrypoint (its richer
+  `/sitrep` skill integrates at that step), so the gate/commit contract is stable.
+- **Slice 7: the publish step invokes `scripts/brief.py` directly, not `claude -p
+  /sitrep`.** Issue #10 phrases the publish as a headless `/sitrep` skill run;
+  Slice 6 (the LLM brief) is being built concurrently in a separate worktree, so to
+  avoid a dependency this slice wires the deterministic brief entrypoint and leaves
+  a comment that Slice 6's skill integrates at that step. The `OPENCODE_API_KEY`
+  secret is still referenced on the step (consumed once the LLM brief lands),
+  never hard-coded.
+- **Slice 7: the fast tick renders but does NOT commit `dashboard.html`.**
+  `scripts/run.py` always renders a dashboard, but `fast_tick.sh` commits only
+  `state/ledger.db` (role=tick owns just the ledger). The 08:30 brief is the
+  canonical committed writer of `dashboard.html` (`BRIEF_COMMIT_PATHS`), resolving
+  the Slice-5 open item ("wiring the 08:30 brief as the canonical writer of the
+  committed file is Slice 7's concern"). The tick's local render is ephemeral on
+  the stateless cloud agent.
 
 - **Slice 5: the disappearance-detection heuristic** (`ledger.reconcile_absences`)
   distinguishes retraction from aged-out from an outage using config windows
