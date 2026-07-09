@@ -32,9 +32,24 @@ def _origin_sgt(iso_utc: str | None) -> str:
     return format_sgt(datetime.fromisoformat(iso_utc))
 
 
+# GDACS alert colours, for the (conditionally rendered) severity tag. Inline so
+# the always-emitted <style> block — hence the USGS-only output — stays byte-for-
+# byte identical to slice 1.
+_ALERT_COLOUR = {"green": "#2e7d32", "orange": "#e65100", "red": "#b30000"}
+
+
 def render_dashboard(
-    events: list[EventRow], as_of_utc: datetime, feed_status: FeedStatus
+    events: list[EventRow],
+    as_of_utc: datetime,
+    feed_status: FeedStatus,
+    feed_statuses: list[FeedStatus] | None = None,
 ) -> str:
+    """Render the dashboard. ``feed_statuses`` lists every feed the run touched
+    (defaulting to just ``feed_status`` for slice-1 callers); one banner is
+    emitted per non-ok feed. The USGS-only render is byte-identical to slice 1:
+    the sources/alert tags render only when a second feed corroborates a quake,
+    and each banner reads ``<SOURCE> feed ...`` (``usgs`` -> ``USGS``)."""
+    statuses = list(feed_statuses) if feed_statuses is not None else [feed_status]
     template = _env.get_template("dashboard.html.j2")
     rendered = [
         {
@@ -43,21 +58,35 @@ def render_dashboard(
             "place": e.place,
             "origin_sgt": _origin_sgt(e.origin_time),
             "origin_utc": e.origin_time or "",
+            "sources": e.sources,
+            "sources_label": " · ".join(s.upper() for s in e.sources),
+            "gdacs_alert": e.gdacs_episodealertlevel,
+            "gdacs_alert_colour": _ALERT_COLOUR.get(
+                (e.gdacs_episodealertlevel or "").lower(), "#5b5b57"
+            ),
         }
         for e in events
+    ]
+    banners = [
+        {"label": s.source.upper(), "state": s.state.value, "detail": s.detail}
+        for s in statuses
+        if not s.is_ok
     ]
     return template.render(
         as_of=format_sgt(as_of_utc),
         events=rendered,
-        feed_ok=feed_status.is_ok,
-        feed_state=feed_status.state.value,
-        feed_detail=feed_status.detail,
+        feed_banners=banners,
     )
 
 
 def write_dashboard(
-    events: list[EventRow], as_of_utc: datetime, feed_status: FeedStatus, out_path: str | Path
+    events: list[EventRow],
+    as_of_utc: datetime,
+    feed_status: FeedStatus,
+    out_path: str | Path,
+    feed_statuses: list[FeedStatus] | None = None,
 ) -> None:
     Path(out_path).write_text(
-        render_dashboard(events, as_of_utc, feed_status), encoding="utf-8"
+        render_dashboard(events, as_of_utc, feed_status, feed_statuses),
+        encoding="utf-8",
     )

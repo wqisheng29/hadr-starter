@@ -158,6 +158,34 @@ byte-unchanged):
   untested `scripts/run.py` CLI (happy-path exit 0 + artifacts, bad/naive
   `--as-of` exit 2, the required source group, and a graceful+idempotent run over
   a feed carrying a malformed feature).
+### Slice 2 — cross-feed identity (USGS + GDACS → one canonical event)
+
+- **The crosswalk is three deterministic tiers, resolved in priority order** in
+  `matcher.resolve_canonical_id_gdacs`: (a) GDACS `source`/`sourceid` → USGS `id`
+  (NEIC-sourced quakes are near-exact, so a NEIC record attaches to the USGS
+  canonical event it duplicates); (b) shared **GLIDE**; (c) GDACS's own native
+  key `{eventtype}:{eventid}` (stable across episodes). First hit wins; a new
+  `gdacs:EQ:{eventid}` is minted only when none match. This is exactly the seam
+  slice 1 left in `feed_identifiers` — GDACS adds `(gdacs, EQ:eventid)`,
+  `(glide, …)`, and the `(usgs, sourceid)` crosswalk rows; no schema reshape.
+- **USGS owns the physical facts; GDACS owns severity.** `reconcile_gdacs`
+  touches only the GDACS-derived columns (`gdacs_eventid`, `gdacs_episodeid`,
+  `gdacs_alertlevel`, `gdacs_episodealertlevel`, `glide`, `country`) — never the
+  USGS magnitude/place/title on a combined event. A GDACS-only event (no USGS
+  twin) is inserted from GDACS data instead.
+- **`alertlevel` (event-max) vs `episodealertlevel` (latest) are stored
+  distinctly**, introduced now because GDACS brings the fields: `alertlevel` is
+  monotonic (the highest severity ever seen, "was it ever severe"),
+  `episodealertlevel` is always the latest authoritative value. Slice 3/4 depend
+  on this distinction.
+- **GDACS is not magnitude-floored** (unlike USGS's M4.5 gate). Per the PRD
+  materiality rule, presence in GDACS (any colour) *is* the gate — and dropping a
+  GDACS record would throw away corroboration of an already-stored USGS event.
+- **Per-feed graceful degradation.** `run(gdacs_source=…)` reconciles USGS then
+  GDACS onto the same ledger; either feed being unreachable/unparseable is a
+  banner + warning, never a crash, and the other feed's data still renders.
+  `RunResult` gained `feed_statuses` (all feeds touched) while `feed_status`
+  stays the USGS/primary feed for slice-1 callers.
 
 ## Open questions
 
@@ -215,6 +243,39 @@ byte-unchanged):
   untrusted feed/model text). Verified: `<script>` in a `place` is now escaped;
   the committed `dashboard.html` is byte-unchanged because the real fixture data
   has no HTML metacharacters.
+- **Slice 2 reconciles USGS before GDACS** in a combined `run()`. USGS is the
+  detection layer, so processing it first means a NEIC `sourceid` attaches to the
+  existing `usgs:` canonical event rather than minting a `gdacs:` one. (If GDACS
+  arrived first and minted `gdacs:EQ:…`, a later USGS record still folds in
+  correctly: `_link_gdacs_ids` writes the `(usgs, sourceid)` crosswalk row, so the
+  USGS record resolves onto that same canonical event via `resolve_canonical_id` —
+  no duplicate.) A genuine duplicate only arises for a non-NEIC, non-GLIDE pair
+  sharing only physical location, which needs slice-3 spatiotemporal matching and
+  is out of scope. A full merge of two *pre-existing* canonical events is likewise
+  out of scope; when two canonical_ids match within a tier, `sorted(...)[0]` keeps
+  the pick deterministic.
+- **Multiple GDACS records collapsing to one canonical event fold before writing.**
+  `reconcile_gdacs` groups records that resolve to the same `canonical_id`
+  (aftershocks sharing a GLIDE, or several episodes of one eventid in one payload)
+  and writes each group once from a deterministic fold — event-max
+  `gdacs_alertlevel` across the group, latest-episode fields chosen by
+  `(origin_time, episodeid, eventid)` (payload-order-independent). Writing
+  per-record instead let records overwrite each other's columns and re-fire the
+  UPDATE on every re-run (`last_updated` churn under a real clock, which would also
+  poison slice 5's "since last brief" diff). A newly-minted GDACS-only event gets a
+  base row inserted during the resolve pass so identifier links satisfy the
+  `feed_identifiers → canonical_events` FK and a later record can find it by GLIDE.
+  Found by an adversarial review subagent; the shipped tests missed it because they
+  used a single record or separate `reconcile_gdacs` calls.
+- **Slice 2 adds six nullable GDACS columns to `canonical_events`** via the
+  `CREATE TABLE IF NOT EXISTS` schema, with no migration — consistent with
+  `state/` being a git-ignored, ephemeral artifact until slice 7. A pre-existing
+  DB from slice 1 would lack the columns; the schema is meant to be rebuilt.
+- **GDACS dashboard tags use inline styles**, deliberately, so the always-emitted
+  `<style>` block is untouched and the **USGS-only `dashboard.html` stays
+  byte-identical** to slice 1 (verified by diff against `HEAD:dashboard.html`).
+  The sources tag renders only when >1 real feed corroborates a quake; GLIDE is a
+  cross-feed disaster number, not a feed, so it is excluded from the shown sources.
 
 <!-- Anything built that departs from the PRD or CLAUDE.md is recorded here,
      with the reason. An undocumented deviation is a bug. -->

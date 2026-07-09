@@ -1,0 +1,35 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [99.6, -1.4] },
+      "properties": {
+        "eventtype": "EQ",
+        "eventid": 1550999,
+        "episodeid": 1716999,
+        "glide": "",
+        "name": "Earthquake 120 km SW of Padang, Indonesia",
+        "htmldescription": "Orange M 6.8 Earthquake in Indonesia.",
+        "alertlevel": "Orange",
+        "alertscore": 1.5,
+        "episodealertlevel": "Orange",
+        "episodealertscore": 1.5,
+        "istemporary": "false",
+        "iscurrent": "true",
+        "country": "Indonesia",
+        "iso3": "IDN",
+        "fromdate": "2026-07-08T00:26:40",
+        "todate": "2026-07-08T00:26:40",
+        "datemodified": "2026-07-08T00:36:40",
+        "source": "NEIC",
+        "sourceid": "us7000abcd",
+        "severitydata": {
+          "severity": 6.8,
+          "severitytext": "Magnitude 6.8M, Depth:30km",
+          "severityunit": "M"
+        }
+      }
+    }
+  ]
+}

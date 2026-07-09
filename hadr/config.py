@@ -14,6 +14,19 @@ MIN_MAGNITUDE: float = 4.5
 # USGS "all earthquakes, past day" summary feed (verified in feeds/usgs.md).
 USGS_URL: str = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
 
+# GDACS EVENTS4APP GeoJSON event list (verified in feeds/gdacs.md).
+GDACS_URL: str = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP"
+
+# GDACS `source` values that denote a US/NEIC-detected quake — i.e. the same
+# physical event USGS already carries, so its `sourceid` is a USGS `id`. Compared
+# case-insensitively; a match routes the record onto the USGS canonical event.
+NEIC_SOURCES: frozenset[str] = frozenset({"neic", "us", "usgs"})
+
+# GDACS alert-level ranking (green < orange < red). Used to keep the event-level
+# `gdacs_alertlevel` monotonic ("was it ever this severe"), distinct from the
+# latest-episode `gdacs_episodealertlevel`. Compared case-insensitively.
+GDACS_ALERT_RANK: dict[str, int] = {"green": 0, "orange": 1, "red": 2}
+
 # Default artifact locations, relative to the current working directory.
 DEFAULT_DB_PATH: Path = Path("state/ledger.db")
 DEFAULT_OUT_PATH: Path = Path("dashboard.html")

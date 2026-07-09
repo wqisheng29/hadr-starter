@@ -1,0 +1,59 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [100.1, -0.9] },
+      "properties": {
+        "eventtype": "EQ",
+        "eventid": 1551200,
+        "episodeid": 1717200,
+        "glide": "EQ-2026-000123-IDN",
+        "name": "Earthquake near Bukittinggi, Indonesia",
+        "alertlevel": "Orange",
+        "alertscore": 1.4,
+        "episodealertlevel": "Orange",
+        "episodealertscore": 1.4,
+        "country": "Indonesia",
+        "iso3": "IDN",
+        "fromdate": "2026-07-08T01:10:00",
+        "todate": "2026-07-08T01:10:00",
+        "datemodified": "2026-07-08T01:20:00",
+        "source": "IDC",
+        "sourceid": "idc0001",
+        "severitydata": {
+          "severity": 5.9,
+          "severitytext": "Magnitude 5.9M",
+          "severityunit": "M"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [100.3, -1.1] },
+      "properties": {
+        "eventtype": "EQ",
+        "eventid": 1551201,
+        "episodeid": 1717201,
+        "glide": "EQ-2026-000123-IDN",
+        "name": "Aftershock near Bukittinggi, Indonesia",
+        "alertlevel": "Green",
+        "alertscore": 0.8,
+        "episodealertlevel": "Green",
+        "episodealertscore": 0.8,
+        "country": "Indonesia",
+        "iso3": "IDN",
+        "fromdate": "2026-07-08T01:40:00",
+        "todate": "2026-07-08T01:40:00",
+        "datemodified": "2026-07-08T01:50:00",
+        "source": "GFZ",
+        "sourceid": "gfz9999",
+        "severitydata": {
+          "severity": 5.2,
+          "severitytext": "Magnitude 5.2M",
+          "severityunit": "M"
+        }
+      }
+    }
+  ]
+}

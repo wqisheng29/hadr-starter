@@ -29,12 +29,12 @@
   <p class="as-of">as of {{ as_of }}</p>
 </header>
 
-{% if not feed_ok %}
+{% for b in feed_banners %}
 <div class="banner">
-  USGS feed {{ feed_state }}{% if feed_detail %}: {{ feed_detail }}{% endif %}.
+  {{ b.label }} feed {{ b.state }}{% if b.detail %}: {{ b.detail }}{% endif %}.
   Showing the last known picture; it may be stale.
 </div>
-{% endif %}
+{% endfor %}
 
 <section class="events">
 {% if events %}
@@ -45,7 +45,7 @@
     <tbody>
     {% for e in events %}
       <tr>
-        <td>{{ e.title if e.title is not none else "—" }}</td>
+        <td>{{ e.title if e.title is not none else "—" }}{% if e.sources|length > 1 %} <span style="font-size:0.7rem; color:#5b5b57; white-space:nowrap;">{{ e.sources_label }}</span>{% endif %}{% if e.gdacs_alert %} <span style="font-size:0.7rem; font-weight:600; color:{{ e.gdacs_alert_colour }};">{{ e.gdacs_alert }}</span>{% endif %}</td>
         <td class="mag">{{ "M%.1f"|format(e.magnitude) if e.magnitude is not none else "—" }}</td>
         <td>{{ e.place if e.place is not none else "—" }}</td>
         <td title="{{ e.origin_utc }}">{{ e.origin_sgt }}</td>
