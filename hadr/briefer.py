@@ -9,14 +9,18 @@ an HTML string) so it is testable without touching the filesystem; a thin
 from datetime import datetime
 from pathlib import Path
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, PackageLoader
 
 from .clock import format_sgt, to_sgt
 from .model import EventRow, FeedStatus
 
 _env = Environment(
     loader=PackageLoader("hadr", "templates"),
-    autoescape=select_autoescape(),
+    # Escape unconditionally: every template here renders untrusted third-party
+    # feed text into HTML. select_autoescape() would silently NOT escape, because
+    # its default extension list matches ".html" but not this project's compound
+    # ".html.j2" template names.
+    autoescape=True,
     trim_blocks=True,
     lstrip_blocks=True,
 )
