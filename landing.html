@@ -210,6 +210,21 @@
   .tag.retract { background: var(--ink-soft); color: var(--bg); }
   .tag.prov { background: var(--amber); color: #fff; }
   .tag.conf { background: var(--accent-2); color: #fff; }
+  .change.new { border-color: var(--accent-2); background: var(--accent-2-soft); }
+  .tag.new { background: var(--accent-2); color: #fff; }
+  .tag.aged { background: color-mix(in srgb, var(--ink-soft) 45%, var(--bg)); color: var(--ink); }
+  .tag.corr { background: transparent; color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2); }
+
+  /* change taxonomy legend */
+  .tax-head { font-size: .82rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft); margin: 46px 0 16px; }
+  .tax-head b { color: var(--ink); }
+  .taxonomy { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 820px) { .taxonomy { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .taxonomy { grid-template-columns: 1fr; } }
+  .tax { background: var(--bg-card); border: 1px solid var(--line); border-radius: 11px; padding: 15px 16px; }
+  .tax .tag { display: inline-block; margin-bottom: 9px; }
+  .tax p { margin: 0; font-size: .88rem; color: var(--ink-soft); line-height: 1.45; }
+  .tax p b { color: var(--ink); font-weight: 600; }
 
   /* lifecycle mock */
   .lc-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
@@ -485,10 +500,12 @@
       <p class="kicker">The feature no one else has</p>
       <h2>It tells you what changed — including what it got wrong.</h2>
       <p style="color:var(--ink-soft); font-size:1.05rem; margin:0;">
-        Disaster feeds are living databases: magnitudes get revised, locations shift, events are retracted.
+        Disaster feeds are living databases: magnitudes get revised, locations shift, events are withdrawn.
         Almost every other tool reports once and never looks back. HADR Monitor's briefing leads with
-        <strong>what changed since the last brief</strong> — upgrades, downgrades, and honest retractions of
-        anything it previously told you.
+        <strong>what changed since the last brief</strong>, sorted into six precise kinds of change — and it
+        never conflates a <strong>downgrade</strong> (still real, just smaller) with a <strong>retraction</strong>
+        (positively withdrawn) or an event that merely <strong>aged out</strong> of the feed window — because
+        each demands a very different response.
       </p>
       <ul>
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg><span><strong>Self-correcting.</strong> Yesterday's picture is reconciled against today's data, so your team never acts on stale numbers.</span></li>
@@ -502,10 +519,23 @@
       <div class="mock-body">
         <p class="h">Morning situation report</p>
         <p class="as-of">Changes since yesterday's brief</p>
+        <div class="change new"><span class="tag new">New</span> <b style="margin-top:6px">M6.2 — near Davao, Philippines</b>Not in yesterday's brief. Provisional — impact signal pending.</div>
         <div class="change up"><span class="tag up">Upgraded</span> <b style="margin-top:6px">M6.8 — SW of Padang, Indonesia</b>Revised up from M6.4. PAGER now Orange — significant population exposure.</div>
         <div class="change down"><span class="tag down">Downgraded</span> <b style="margin-top:6px">Cyclone off Luzon</b>Impact score lowered as it tracks out to sea; no longer expected to require international assistance.</div>
         <div class="change retract"><span class="tag retract">Retracted</span> <b style="margin-top:6px">M5.1 — E of Hualien, Taiwan</b>Previously reported yesterday; USGS has since removed this event. Disregard.</div>
       </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <p class="tax-head">Six kinds of change — <b>never conflated</b></p>
+    <div class="taxonomy">
+      <div class="tax"><span class="tag new">New</span><p><b>Present now, absent before.</b> A canonical event that wasn't in the last brief.</p></div>
+      <div class="tax"><span class="tag up">Upgraded</span><p><b>Impact tier rose.</b> Alert colour up, PAGER up, or provisional → confirmed-severe.</p></div>
+      <div class="tax"><span class="tag down">Downgraded</span><p><b>Reassessed as less severe.</b> The event is real, just smaller — even a drop to Green is a downgrade, not a retraction.</p></div>
+      <div class="tax"><span class="tag retract">Retracted</span><p><b>Positively withdrawn by the source.</b> A USGS deletion or a removed GDACS record. Stop acting on it.</p></div>
+      <div class="tax"><span class="tag aged">Aged out</span><p><b>Left the feed window.</b> No longer listed, but <em>not</em> confirmed ended — never read as an all-clear.</p></div>
+      <div class="tax"><span class="tag corr">Correction</span><p><b>A fact revised, tier unchanged.</b> e.g. M6.8 → M6.1 — stated as "we said X, it's now Y, because the source revised it."</p></div>
     </div>
   </div>
 </section>
