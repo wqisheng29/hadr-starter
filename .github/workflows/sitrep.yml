@@ -68,6 +68,16 @@ jobs:
           test -s public/index.html || { echo "::error::no sitrep was written — the agent run failed"; exit 1; }
           grep -q "SGT" public/index.html || { echo "::error::sitrep is missing its 'as of … SGT' line — likely a failed run"; exit 1; }
 
+      - name: Add the static marketing pages to the Pages site
+        # The daily sitrep is generated into public/index.html above. The
+        # marketing landing page and the sample briefing it links to are
+        # static, committed files — copy them into the same artifact so they
+        # publish alongside the live sitrep. A single Pages deploy serves one
+        # directory, so everything client-facing must live under public/.
+        run: |
+          cp landing.html public/landing.html
+          cp dashboard.html public/dashboard.html
+
       - name: Upload the sitrep as the Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
