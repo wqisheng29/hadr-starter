@@ -71,6 +71,25 @@ def load_decisions(path: str | Path) -> list[LinkDecision]:
     return [LinkDecision.from_dict(d) for d in doc.get("decisions", [])]
 
 
+def merge_decisions(
+    existing: list[LinkDecision], new: list[LinkDecision]
+) -> list[LinkDecision]:
+    """Merge this run's ``new`` decisions into the ``existing`` file, preserving
+    what a human recorded. A brief only emits the *current* fuzzy residual, so a
+    plain overwrite would silently drop a human ``METHOD_OVERRIDE`` (advertised in
+    the /sitrep skill) — or any decision not re-emitted this run — before the tick
+    applied it. A new decision replaces an existing *model* decision for the same
+    ReliefWeb id (the model refined its pick), but NEVER clobbers an override
+    (human wins); entries untouched this run are kept."""
+    by_id: dict[str, LinkDecision] = {d.reliefweb_id: d for d in existing}
+    for d in new:
+        current = by_id.get(d.reliefweb_id)
+        if current is not None and current.method == METHOD_OVERRIDE:
+            continue  # never overwrite a human override with a model pick
+        by_id[d.reliefweb_id] = d
+    return list(by_id.values())
+
+
 def write_decisions(path: str | Path, decisions: list[LinkDecision]) -> Path:
     """Write the decisions file (sorted by reliefweb_id for a stable, reviewable
     diff). Deterministic: same decisions in any order -> byte-identical file."""

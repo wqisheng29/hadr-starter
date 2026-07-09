@@ -58,7 +58,7 @@
   {% if e.impact_basis %}<span class="impact-basis"><span class="label">Impact basis</span>{{ e.impact_basis }}</span>{% endif %}
   {% for r in e.reliefweb %}
   <span class="reliefweb">{{ r.excerpt }}
-    <a href="{{ r.url }}">{{ r.title }}</a>
+    {% if r.url %}<a href="{{ r.url }}">{{ r.title }}</a>{% else %}{{ r.title }}{% endif %}
     <span class="attribution">— {{ r.source }}</span>
   </span>
   {% endfor %}

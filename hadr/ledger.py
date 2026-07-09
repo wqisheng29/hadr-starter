@@ -367,14 +367,22 @@ def reconcile_absences(
         if row["status"] in (config.STATUS_RETRACTED, config.STATUS_AGED_OUT):
             continue  # terminal & sticky — absence detection never re-classifies
         sources = _sources_for(conn, canonical_id)
-        if not sources or not all(s in reachable_sources for s in sources):
-            continue  # a vouching feed was unreachable this run — do not infer
+        # Only feeds the fast tick actually POLLS can imply a withdrawal by being
+        # absent. ReliefWeb is curated context that a tick never re-fetches, so it
+        # is never in ``reachable_sources``; counting it as a vouching feed would
+        # make the gate below always fail once an event is enriched, pinning it
+        # active forever and silently disabling Slice 5's aged-out/retract
+        # self-correction for exactly the events Slice 6 links. (GLIDE is already
+        # excluded from ``_sources_for``.)
+        pollable = tuple(s for s in sources if s in (USGS_SOURCE, GDACS_SOURCE))
+        if not pollable or not all(s in reachable_sources for s in pollable):
+            continue  # no pollable feed, or one was unreachable — do not infer
         if row["origin_time"] is None:
             continue  # cannot age an event with no origin time
         age = now - datetime.fromisoformat(row["origin_time"])
         new_status = (
             config.STATUS_AGED_OUT
-            if age > timedelta(hours=_max_window_hours(sources))
+            if age > timedelta(hours=_max_window_hours(pollable))
             else config.STATUS_RETRACTED
         )
         if _mark_status(conn, canonical_id, new_status, now_iso):

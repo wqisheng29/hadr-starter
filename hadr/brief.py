@@ -36,7 +36,13 @@ from .diff import (
     build_diff,
 )
 from .ledger import read_events, reliefweb_links
-from .link_decisions import METHOD_MODEL, LinkDecision, write_decisions
+from .link_decisions import (
+    METHOD_MODEL,
+    LinkDecision,
+    load_decisions,
+    merge_decisions,
+    write_decisions,
+)
 from .llm import ChatModel
 from .published import load_latest_snapshot, write_snapshot
 from .reliefweb import ReliefWebRecord, resolve_glide
@@ -143,7 +149,10 @@ def _impact_basis(
     fallback = _deterministic_basis(e)
     if model is None:
         return fallback
-    result = model.complete(_assessment_messages(e, rw), max_tokens=_ASSESS_MAX_TOKENS)
+    try:
+        result = model.complete(_assessment_messages(e, rw), max_tokens=_ASSESS_MAX_TOKENS)
+    except Exception:  # noqa: BLE001 - a raising model is data, not a crashed brief
+        return fallback
     if result.ok and (result.text or "").strip():
         return result.text.strip()
     return fallback
@@ -176,7 +185,10 @@ def _tiebreak(
     answer resolves to no link (deterministic degrade). Returns a canonical_id or
     None."""
     ids = {c.canonical_id for c in candidates}
-    result = model.complete(_tiebreak_messages(r, candidates), max_tokens=_TIEBREAK_MAX_TOKENS)
+    try:
+        result = model.complete(_tiebreak_messages(r, candidates), max_tokens=_TIEBREAK_MAX_TOKENS)
+    except Exception:  # noqa: BLE001 - a raising model degrades to "no link", never crashes
+        return None
     if not result.ok:
         return None
     choice = (result.text or "").strip()
@@ -326,7 +338,10 @@ def write_brief(
 
     decisions_path = None
     if link_decisions_out is not None:
-        decisions_path = str(write_decisions(link_decisions_out, decisions))
+        # Merge into the existing file (preserving human overrides) rather than
+        # overwriting — the brief only emits this run's fuzzy residual.
+        merged = merge_decisions(load_decisions(link_decisions_out), decisions)
+        decisions_path = str(write_decisions(link_decisions_out, merged))
 
     return BriefResult(
         out_path=str(out_path),

@@ -32,6 +32,15 @@ from .fetch import GLIDE_SOURCE
 ATTRIBUTION = "Source: ReliefWeb"
 
 
+def _safe_url(raw: str) -> str:
+    """Allow only http(s) links. ``url`` is untrusted third-party feed text;
+    autoescape stops attribute breakout but NOT a ``javascript:``/``data:`` scheme,
+    which would render a clickable XSS link. Anything not http(s) is dropped to an
+    inert ``""`` (the template renders no <a> for an empty url)."""
+    scheme = raw.split(":", 1)[0].strip().lower() if ":" in raw else ""
+    return raw if scheme in ("http", "https") else ""
+
+
 @dataclass(frozen=True)
 class ReliefWebRecord:
     """One ReliefWeb disaster item, normalised to the few fields the brief uses.
@@ -52,7 +61,7 @@ class ReliefWebRecord:
         return cls(
             id=str(data["id"]),
             title=data.get("title") or "",
-            url=data.get("url") or "",
+            url=_safe_url(data.get("url") or ""),
             excerpt=data.get("excerpt") or "",
             glide=(data.get("glide") or None),
             source=data.get("source") or ATTRIBUTION,
