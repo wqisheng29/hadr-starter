@@ -23,10 +23,12 @@ Work in this order:
    strong, where, and the likely humanitarian concern (proximity to population,
    depth, coastal/tsunami potential). Do not overstate — if you don't know
    population exposure, say so.
-3. Call `write_dashboard` with the assessed events, most serious first. This is
-   mandatory: actually invoke the tool — do not merely say you are about to.
-   Write the dashboard even when there are zero material events (an empty report
-   is still the morning brief).
+3. Call `write_dashboard` with the assessed events, most serious first, and a
+   one- or two-sentence `summary` — an executive summary of the whole picture
+   (how many material events, the headline concern) shown at the top of the
+   dashboard. This is mandatory: actually invoke the tool — do not merely say you
+   are about to. Write the dashboard even when there are zero material events (an
+   empty report is still the morning brief, and the summary should say so).
 4. Only after `write_dashboard` has returned, reply to the user with a two- or
    three-sentence summary of what you found and that the dashboard was written.
 

@@ -80,20 +80,33 @@ def test_write_dashboard_writes_file_and_reports(frozen_clock, tmp_out):
     tool = write_dashboard_tool(tmp_out, frozen_clock)
     out = json.loads(tool.handler({
         "headline": "Morning brief",
+        "summary": "One material quake overnight; a shallow M6.1 near Foo.",
         "events": [{"title": "M6.1 near Foo", "magnitude": 6.1, "place": "Foo",
                     "assessment": "Shallow, near a town — likely damage."}],
     }))
     assert out["ok"] and out["count"] == 1
     html = tmp_out.read_text(encoding="utf-8")
     assert "Morning brief" in html and "M6.1" in html and "likely damage" in html
+    # the executive summary appears at the top, before the first event
+    assert "Executive summary" in html
+    assert "One material quake overnight" in html
+    assert html.index("One material quake overnight") < html.index("likely damage")
+
+
+def test_write_dashboard_omits_summary_block_when_absent(frozen_clock, tmp_out):
+    tool = write_dashboard_tool(tmp_out, frozen_clock)
+    tool.handler({"events": [{"title": "M6.1", "assessment": "x"}]})
+    assert "Executive summary" not in tmp_out.read_text(encoding="utf-8")
 
 
 def test_write_dashboard_autoescapes_untrusted_text(frozen_clock, tmp_out):
     tool = write_dashboard_tool(tmp_out, frozen_clock)
-    tool.handler({"events": [{"title": "<script>alert(1)</script>",
+    tool.handler({"summary": "<img src=x onerror=alert(1)> & more",
+                  "events": [{"title": "<script>alert(1)</script>",
                               "assessment": "x & y <b>", "place": "P"}]})
     html = tmp_out.read_text(encoding="utf-8")
     assert "<script>alert(1)</script>" not in html
+    assert "<img src=x onerror=alert(1)>" not in html  # summary is escaped too
     assert "&lt;script&gt;" in html and "x &amp; y" in html
 
 

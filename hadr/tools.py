@@ -194,7 +194,9 @@ def fetch_feed_tool(
 # --- write_dashboard ----------------------------------------------------------
 
 
-def render_sitrep(headline: str, events: list[dict], as_of_utc: datetime) -> str:
+def render_sitrep(
+    headline: str, events: list[dict], as_of_utc: datetime, summary: str = ""
+) -> str:
     """Pure render of assessed events to an HTML string (autoescaped)."""
     rows = [
         {
@@ -206,7 +208,7 @@ def render_sitrep(headline: str, events: list[dict], as_of_utc: datetime) -> str
         for e in events
     ]
     return _env.get_template("agent_sitrep.html.j2").render(
-        headline=headline, as_of=format_sgt(as_of_utc), events=rows
+        headline=headline, as_of=format_sgt(as_of_utc), summary=summary, events=rows
     )
 
 
@@ -222,7 +224,8 @@ def write_dashboard_tool(out_path: str | Path, clock: Clock) -> Tool:
         if not isinstance(events, list):
             return _err("'events' must be a list of assessed events")
         headline = args.get("headline") or "HADR situation report"
-        html = render_sitrep(headline, events, clock.now())
+        summary = args.get("summary") or ""
+        html = render_sitrep(headline, events, clock.now(), summary=summary)
         path = Path(out_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(html, encoding="utf-8")
@@ -231,9 +234,10 @@ def write_dashboard_tool(out_path: str | Path, clock: Clock) -> Tool:
     return Tool(
         name="write_dashboard",
         description=(
-            "Save an HTML dashboard of assessed events to disk. Provide the "
-            "events you have assessed, each with a short impact assessment. Call "
-            "this once you have gathered and judged the events."
+            "Save an HTML dashboard of assessed events to disk. Provide a one- or "
+            "two-sentence executive summary of the whole picture, plus the events "
+            "you have assessed each with a short impact assessment. Call this once "
+            "you have gathered and judged the events."
         ),
         parameters={
             "type": "object",
@@ -241,6 +245,13 @@ def write_dashboard_tool(out_path: str | Path, clock: Clock) -> Tool:
                 "headline": {
                     "type": "string",
                     "description": "short title for the report",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": (
+                        "executive summary of all the events in one or two "
+                        "sentences, shown at the top of the dashboard"
+                    ),
                 },
                 "events": {
                     "type": "array",
@@ -260,7 +271,7 @@ def write_dashboard_tool(out_path: str | Path, clock: Clock) -> Tool:
                     },
                 },
             },
-            "required": ["events"],
+            "required": ["summary", "events"],
         },
         handler=handler,
     )
