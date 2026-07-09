@@ -424,7 +424,7 @@
       <div class="card">
         <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M10.5 5.5l1-1a4 4 0 0 1 5.7 5.7l-1 1"/><path d="M13.5 18.5l-1 1a4 4 0 0 1-5.7-5.7l1-1"/></svg></div>
         <h3>Humanitarian context, on the right event</h3>
-        <p>ReliefWeb disaster records, situation reports and needs assessments are linked back to the quake they describe — by GLIDE number, or a recorded fuzzy match — so context lands on the correct canonical event, never a duplicate.</p>
+        <p>ReliefWeb disaster records, situation reports and needs assessments are linked back to the quake they describe — by GLIDE number, or a recorded fuzzy match — so context lands on the correct canonical event, never a duplicate. Every judgement-call link is written down and a person can override a mis-link — corrected once, it stays corrected.</p>
       </div>
       <div class="card">
         <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 12.5h5"/></svg></div>
@@ -574,7 +574,7 @@
       <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 4v6c0 4.5-3 7.5-7 10-4-2.5-7-5.5-7-10V6z"/><path d="M12 7v10M7.5 10.5h9"/></svg></div>
       <div>
         <h3>Deterministic where it counts. Judgement where it helps.</h3>
-        <p>The hot path — matching events across feeds, tracking every change, and deciding what breaks the silence — is plain, testable code: the same inputs always produce the same picture and the same alert. A language model is trusted only <em>above</em> that line, to weigh impact and write the brief in readable prose. So the numbers stay reproducible and the writing stays human — and neither job contaminates the other.</p>
+        <p>The hot path — matching events across feeds, tracking every change, and deciding what breaks the silence — is plain, testable code: the same inputs always produce the same picture and the same alert. A language model is trusted only <em>above</em> that line, to weigh impact and write the brief in readable prose. So the numbers stay reproducible and the writing stays human — and neither job contaminates the other. And the model is only ever woken when that deterministic check says something actually changed — a quiet morning runs for free and reads "no material change," so the cost, and your attention, are spent only when it matters.</p>
       </div>
     </div>
   </div>
@@ -629,6 +629,15 @@
       <h2>What it deliberately does <em>not</em> do.</h2>
       <p>Good situational awareness knows its own limits. Being explicit about what HADR Monitor is <em>not</em> is what keeps its briefings trustworthy — and tells your team exactly where to look elsewhere.</p>
     </div>
+
+    <div class="honest" style="margin-bottom:34px;">
+      <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg></div>
+      <div>
+        <h3>Every briefing tells you what it couldn't see.</h3>
+        <p>The best defence against a false sense of safety is a monitor that states its own blind spots — so it doesn't just report what it found, it closes each brief with what it <em>can't</em> see: it watches earthquakes only (not floods, landslides, heat or conflict), global detection is reliable only to about M4.5, and a feed's <code>tsunami</code> flag is not a NOAA tsunami warning. You never mistake its silence for the absence of a disaster.</p>
+      </div>
+    </div>
+
     <div class="grid">
       <div class="card bound">
         <div class="icon no" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></div>
