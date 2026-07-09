@@ -20,3 +20,11 @@ DEFAULT_OUT_PATH: Path = Path("dashboard.html")
 
 # Singapore Standard Time is a fixed UTC+8 (no DST). Used for the "as of" header.
 SGT_TZ_NAME: str = "Asia/Singapore"
+
+# LLM provider: OpenCode Go, an OpenAI-compatible gateway (docs.opencode.ai/go).
+# The API key is read from the OPENCODE_API_KEY env var (never stored here);
+# these two are overridable via OPENCODE_BASE_URL / OPENCODE_MODEL. Go serves
+# curated open-source coding models (GLM, Kimi, DeepSeek, Qwen, ...) — the
+# frontier models live on the separate pay-as-you-go Zen tier.
+OPENCODE_BASE_URL: str = "https://opencode.ai/zen/go/v1"
+OPENCODE_MODEL: str = "glm-5.2"

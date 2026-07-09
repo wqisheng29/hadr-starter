@@ -21,6 +21,25 @@ Kept by the agent, reviewed by you. One entry per working block.
   real clock (not just a frozen one).
 - **`null` magnitude is treated as below the floor** (dropped), decided explicitly.
 
+### Model provider — OpenCode Go
+
+- **Provider is OpenCode Go**, an OpenAI-compatible gateway
+  (`https://opencode.ai/zen/go/v1`, bearer auth). Chosen because that is the key
+  the operator has; it drops into a standard `/chat/completions` client.
+- **`hadr/llm.py` is an injected edge**, the same shape as `FeedSource`/`Clock`:
+  a `ChatModel` Protocol + `OpenCodeChatModel`, failures returned as
+  `ChatResult(ok=False, ...)` rather than raised. Tests use `httpx.MockTransport`
+  (no network), like the feed tests.
+- **Key from `OPENCODE_API_KEY` env only** — never a flag or a stored value.
+  Base URL / model overridable via `OPENCODE_BASE_URL` / `OPENCODE_MODEL`;
+  defaults live in `config.py` (`glm-5.2`).
+- **Go serves open-source coding models** (GLM/Kimi/DeepSeek/Qwen), *not* the
+  frontier Claude/GPT/Gemini models (those are the separate pay-as-you-go Zen
+  tier). If a slice later needs a frontier model, point the base URL at Zen.
+- **No caller yet.** This is only the provider seam + a `scripts/check_model.py`
+  smoke test to verify the key. Wiring it into impact assessment / briefing prose
+  is Slice 6 (ADR-0001) and is deliberately not done here.
+
 ## Open questions
 
 ## Deviations
