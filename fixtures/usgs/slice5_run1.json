@@ -1,0 +1,109 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "title": "USGS All Earthquakes, Past Day",
+    "count": 4
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 6.8,
+        "place": "90 km W of Sumatra, Indonesia",
+        "time": 1783463400000,
+        "updated": 1783463460000,
+        "alert": null,
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 500,
+        "ids": ",us7000corr,",
+        "type": "earthquake",
+        "title": "M 6.8 - 90 km W of Sumatra, Indonesia"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          99.0,
+          -1.0,
+          30.0
+        ]
+      },
+      "id": "us7000corr"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 5.5,
+        "place": "12 km NE of Reykjavik, Iceland",
+        "time": 1783463400000,
+        "updated": 1783463460000,
+        "alert": null,
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 500,
+        "ids": ",us7000retr,",
+        "type": "earthquake",
+        "title": "M 5.5 - 12 km NE of Reykjavik, Iceland"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -21.8,
+          64.2,
+          30.0
+        ]
+      },
+      "id": "us7000retr"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 5.0,
+        "place": "40 km S of Tokyo, Japan",
+        "time": 1783110600000,
+        "updated": 1783110660000,
+        "alert": null,
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 500,
+        "ids": ",us7000aged,",
+        "type": "earthquake",
+        "title": "M 5.0 - 40 km S of Tokyo, Japan"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          139.7,
+          35.3,
+          30.0
+        ]
+      },
+      "id": "us7000aged"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 4.8,
+        "place": "5 km E of Ridgecrest, CA",
+        "time": 1783463400000,
+        "updated": 1783463460000,
+        "alert": null,
+        "status": "reviewed",
+        "tsunami": 0,
+        "sig": 500,
+        "ids": ",us7000ong,",
+        "type": "earthquake",
+        "title": "M 4.8 - 5 km E of Ridgecrest, CA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -117.6,
+          35.6,
+          30.0
+        ]
+      },
+      "id": "us7000ong"
+    }
+  ]
+}
