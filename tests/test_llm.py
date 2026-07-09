@@ -83,6 +83,50 @@ def test_empty_reply_without_truncation_is_still_ok():
     assert result.ok and result.text == ""
 
 
+def test_tools_are_sent_and_tool_calls_parsed():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"choices": [{
+            "message": {
+                "content": None,
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "fetch_feed", "arguments": '{"source": "usgs"}'},
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }]})
+
+    tools = [{"type": "function", "function": {"name": "fetch_feed", "parameters": {}}}]
+    result = _model(handler).complete([{"role": "user", "content": "go"}], tools=tools)
+
+    assert result.ok
+    assert seen["body"]["tools"] == tools          # schemas forwarded
+    assert seen["body"]["tool_choice"] == "auto"
+    assert len(result.tool_calls) == 1
+    call = result.tool_calls[0]
+    assert (call.id, call.name, call.arguments_json) == ("call_1", "fetch_feed", '{"source": "usgs"}')
+    # the assistant turn is rebuilt for appending, content coerced from null
+    assert result.message["role"] == "assistant" and result.message["content"] == ""
+    assert result.message["tool_calls"][0]["id"] == "call_1"
+
+
+def test_no_tools_means_no_tools_key():
+    seen = {}
+
+    def handler(request):
+        import json
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "hi"}}]})
+
+    _model(handler).complete([{"role": "user", "content": "x"}])
+    assert "tools" not in seen["body"] and "tool_choice" not in seen["body"]
+
+
 def test_list_models_reads_data_ids_and_degrades():
     def ok(request):
         return httpx.Response(200, json={"data": [{"id": "glm-5.2"}, {"id": "kimi-k2.7-code"}]})

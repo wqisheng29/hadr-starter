@@ -34,12 +34,35 @@ ENV_MODEL = "OPENCODE_MODEL"
 
 
 @dataclass(frozen=True)
+class ToolCall:
+    """One tool the model asked us to run, straight off the wire.
+
+    ``arguments_json`` is the raw JSON string the model emitted; it is *not*
+    parsed here (a model can emit invalid JSON, and parsing it is the tool
+    dispatcher's job so the failure can be handed back to the model as data).
+    """
+
+    id: str
+    name: str
+    arguments_json: str
+
+
+@dataclass(frozen=True)
 class ChatResult:
-    """Outcome of one model call. ``ok`` gates ``text`` vs ``error``."""
+    """Outcome of one model call.
+
+    ``ok`` gates ``text``/``tool_calls`` vs ``error``. When the model wants a
+    tool, ``tool_calls`` is non-empty and ``text`` is usually empty. ``message``
+    is the assistant turn to append verbatim to the thread before the tool
+    results — the OpenAI protocol requires the assistant's ``tool_calls`` message
+    to precede the matching ``role: "tool"`` messages.
+    """
 
     ok: bool
     text: str | None = None
     error: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
+    message: dict | None = None
 
 
 # Default token budget. Reasoning models (glm-5.2 spends ~750 tokens of hidden
@@ -50,7 +73,11 @@ DEFAULT_MAX_TOKENS = 2048
 
 class ChatModel(Protocol):
     def complete(
-        self, messages: list[dict], *, max_tokens: int = DEFAULT_MAX_TOKENS
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> ChatResult:
         ...
 
@@ -79,9 +106,16 @@ class OpenCodeChatModel:
         return self._model
 
     def complete(
-        self, messages: list[dict], *, max_tokens: int = DEFAULT_MAX_TOKENS
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> ChatResult:
-        payload = {"model": self._model, "messages": messages, "max_tokens": max_tokens}
+        payload: dict = {"model": self._model, "messages": messages, "max_tokens": max_tokens}
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
         try:
             resp = self._client.post(
                 f"{self._base}/chat/completions", json=payload, headers=self._headers
@@ -94,21 +128,43 @@ class OpenCodeChatModel:
 
         try:
             choice = resp.json()["choices"][0]
-            content = choice["message"]["content"]
-        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            message = choice["message"]
+            content = message.get("content")
+            raw_tool_calls = message.get("tool_calls") or []
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError) as exc:
             return ChatResult(ok=False, error=f"unexpected response shape: {exc}")
+
+        tool_calls = tuple(
+            ToolCall(
+                id=tc.get("id", ""),
+                name=tc.get("function", {}).get("name", ""),
+                arguments_json=tc.get("function", {}).get("arguments", "") or "",
+            )
+            for tc in raw_tool_calls
+            if isinstance(tc, dict)
+        )
+
+        # Rebuild the assistant turn to append to the thread. content may be null
+        # when the model only calls tools; the protocol still wants the key.
+        assistant_message: dict = {"role": "assistant", "content": content or ""}
+        if raw_tool_calls:
+            assistant_message["tool_calls"] = raw_tool_calls
 
         # Reasoning models (e.g. glm-5.2) burn max_tokens on hidden reasoning
         # before emitting content; a too-small budget yields HTTP 200 with an
-        # empty reply. That is a failure, not an answer.
-        if not content and choice.get("finish_reason") == "length":
+        # empty reply. That is a failure, not an answer — unless the model spent
+        # the turn asking for tools, in which case empty content is expected.
+        if not content and not tool_calls and choice.get("finish_reason") == "length":
             return ChatResult(
                 ok=False,
                 error="empty reply: max_tokens exhausted by reasoning before any "
                 "content (finish_reason=length) — raise max_tokens",
+                message=assistant_message,
             )
 
-        return ChatResult(ok=True, text=content)
+        return ChatResult(
+            ok=True, text=content, tool_calls=tool_calls, message=assistant_message
+        )
 
     def list_models(self) -> list[str]:
         """Best-effort model ids from the gateway's ``/models`` endpoint.

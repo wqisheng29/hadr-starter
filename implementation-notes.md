@@ -48,6 +48,39 @@ Kept by the agent, reviewed by you. One entry per working block.
   `"thinking": {"type": "disabled"}` (verified: cuts the same call to ~106
   tokens) — not exposed in the client yet; add it if Slice 6 cost matters.
 
+### Agent loop — chat loop + tools (the `/goal`-able mechanism)
+
+- **The five-part shape, all injected at the same seam.** `scripts/agent.py` is
+  the chat loop (read → append to `messages` → send → print). The system prompt
+  is a plain text file prepended as `messages[0]` (`--system`, default
+  `prompts/agent_system.md`) — the point being that "standing orders" are just a
+  file, which is all a CLAUDE.md is. Two tools live in `hadr/tools.py`:
+  `fetch_feed` (fetch + `parse_usgs` → compact JSON events) and `write_dashboard`
+  (assessed events → `reports/sitrep.html`). `hadr/agent.py::run_agent` is the
+  loop: while the model returns `tool_calls`, run them, append each result as a
+  `role:"tool"` turn, and go again; stop on a plain-text reply or a `max_steps`
+  guard. That guard-able loop is exactly what a `/goal` checker would wrap.
+- **Tool-calling added to `llm.py` without breaking the one-shot seam.**
+  `complete()` gained an optional `tools=` arg (adds `tools` + `tool_choice:auto`
+  to the payload); `ChatResult` gained `tool_calls` and a rebuilt `message` (the
+  assistant turn to append verbatim before the tool results, per the OpenAI
+  protocol). The reasoning-truncation guard now fires only when there are no tool
+  calls, since empty `content` is expected when the model is only calling tools.
+- **Failures are data, here too.** `ToolRegistry.dispatch` never raises — unknown
+  tool, invalid-JSON arguments, or a handler exception all return an
+  `{"ok":false,"error":...}` string the model reads and reacts to, so neither a
+  bad feed nor a misbehaving model crashes the loop.
+- **Tools take injected dependencies** (`fetch_feed` a `{name: FeedSource}` map,
+  `write_dashboard` an out-path + `Clock`), so the whole layer is tested against
+  fixtures + a `FrozenClock` with no network. Verified live end-to-end against
+  `glm-5.2` (9 Jul 2026): it called `fetch_feed`, assessed the fixture quakes,
+  dropped the sub-floor/null-mag ones, called `write_dashboard`, and summarised —
+  no invented events. glm-5.2 does support tool-calling through the Go gateway.
+- **Agent dashboard is a separate artifact.** `write_dashboard` writes
+  `reports/sitrep.html` (git-ignored) via its own `agent_sitrep.html.j2` template,
+  deliberately *not* the committed deterministic `dashboard.html` — the agent's
+  output is model-authored and experimental, not the pipeline's product.
+
 ## Open questions
 
 ## Deviations
@@ -67,6 +100,16 @@ Kept by the agent, reviewed by you. One entry per working block.
   `dashboard.html` is still committed (it is the product).
 - **Reconcile is insert/update-only.** A quake absent from a later fetch is left
   as-is, never deleted — retraction/aged-out status is deliberately slice 3+.
+- **Autoescape bug fixed (was a latent stored-XSS).** CLAUDE.md requires
+  "autoescape on for any third-party feed text rendered into HTML," and both
+  `briefer.py` and the new `tools.py` used `select_autoescape()`. But its default
+  extension list matches `.html`/`.htm`/`.xml`, *not* this project's compound
+  `.html.j2` template names — so autoescape was silently **off**, and untrusted
+  USGS `place`/`title` went into `dashboard.html` unescaped. Both environments now
+  set `autoescape=True` unconditionally (every template here emits HTML from
+  untrusted feed/model text). Verified: `<script>` in a `place` is now escaped;
+  the committed `dashboard.html` is byte-unchanged because the real fixture data
+  has no HTML metacharacters.
 
 <!-- Anything built that departs from the PRD or CLAUDE.md is recorded here,
      with the reason. An undocumented deviation is a bug. -->
