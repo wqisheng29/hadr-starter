@@ -187,6 +187,56 @@ byte-unchanged):
   `RunResult` gained `feed_statuses` (all feeds touched) while `feed_status`
   stays the USGS/primary feed for slice-1 callers.
 
+### Slice 3 — provisional → confirmed lifecycle
+
+- **Confirmation is a fold over feed-native signals — NO enrichment fetch.**
+  Every event is `provisional` on first detection and firms to `confirmed` when
+  any one confirming signal is present in a feed record the pipeline already has:
+  USGS `properties.status` == `reviewed` (automatic→reviewed is a settle), a
+  non-null USGS PAGER colour (`properties.alert`), or GDACS `istemporary` ==
+  `"false"` (a settled, no-longer-temporary alert; a settled ShakeMap flips it
+  off). We deliberately do **not** fetch PAGER/ShakeMap — that's a later slice.
+- **The rule's inputs live in `config`, not prose.** `CONFIRMED_USGS_STATUS =
+  "reviewed"`, the `STATUS_PROVISIONAL`/`STATUS_CONFIRMED` labels, and the
+  headline/material set `MATERIAL_ALERT_LEVELS = {"orange","red"}`. The ledger's
+  status refresh and the briefer's classification both read these — no magic
+  strings in logic or the template.
+- **One deterministic refresh helper, called from both reconcile paths.**
+  `ledger._refresh_status` recomputes status from the stored signals
+  (`usgs_status`, `pager_alert`, `gdacs_is_temporary`) after each upsert, so
+  either feed's settle promotes the event. It is **sticky**: `_lifecycle_status`
+  never regresses a `confirmed` row to `provisional` (a signal that un-sets
+  doesn't un-settle). A status change bumps `last_updated`; no change writes
+  nothing.
+- **The refresh is not counted in `rows_written`.** Promotion is a derived
+  consequence of a feed update that the tracked-field comparison already counted
+  (e.g. `usgs_status` and `gdacs_is_temporary` are now in `_TRACKED`/
+  `_GDACS_TRACKED`), so counting the refresh too would double-count one logical
+  change and break the existing `rows_written` assertions. The status write still
+  bumps `last_updated` on a real change; on a re-run the status is already correct
+  so it writes nothing (combined USGS+GDACS re-run stays `rows_written == 0`,
+  byte-identical dashboard).
+- **`istemporary` models the GDACS "settled" signal.** Parsed `"true"/"false"` →
+  bool with missing/unrecognised → `True` (conservative "not yet settled"), and
+  stored as INTEGER `0/1` in `gdacs_is_temporary` so the idempotency comparison
+  round-trips cleanly through SQLite (mirrors the care Slice 2 took). The stored
+  column follows the *latest* episode (like `episodealertlevel`); confirmation
+  itself is what's sticky, so a later temporary episode can't demote a confirmed
+  event.
+- **Dashboard headlines material/confirmed, folds routine.** The briefer splits
+  events into a headline table (with a `provisional`/`confirmed` tag per row) and
+  a collapsed "Routine / ongoing (N)" list below the fold. Material = confirmed
+  OR current severity in `MATERIAL_ALERT_LEVELS` OR magnitude ≥
+  `HEADLINE_MIN_MAGNITUDE` (see below). The empty-state ("No earthquakes at or
+  above the materiality floor.") and the "as of" SGT header are unchanged.
+- **A strong provisional quake headlines on magnitude alone**
+  (`HEADLINE_MIN_MAGNITUDE`, default M6.0), added after review. "Routine" means a
+  *minor* quake near the M4.5 floor, not a major one that simply hasn't been
+  reviewed yet — folding a fresh M6.8 below the fold because its PAGER/ShakeMap
+  hasn't landed (they take ~20–40 min) would bury the single most important event.
+  This governs dashboard *surfacing* only and does **not** loosen the urgent-push
+  rule, which stays confirmation-only with no magnitude escape hatch (Slice 4).
+
 ## Open questions
 
 ## Deviations
@@ -206,6 +256,21 @@ byte-unchanged):
   `dashboard.html` is still committed (it is the product).
 - **Reconcile is insert/update-only.** A quake absent from a later fetch is left
   as-is, never deleted — retraction/aged-out status is deliberately slice 3+.
+- **The committed `dashboard.html` changed structure this slice** (the
+  byte-identical-to-slice-1 guarantee was slices 1–2 only). It is regenerated
+  deterministically via `python scripts/run.py --fixture fixtures/usgs/all_day.json
+  --as-of 2026-07-08T00:30:00Z --db <tmp> --out dashboard.html` and is
+  byte-identical across fresh-DB re-runs. In the USGS-only `all_day.json` the M6.8
+  Padang quake is `automatic` with a null PAGER, so it is **provisional** — but it
+  still **headlines** (tagged provisional) because it clears
+  `HEADLINE_MIN_MAGNITUDE`, while the M5.1 Hualien quake (`status=reviewed`) is
+  confirmed and the M4.5 Avalon quake folds into "Routine / ongoing". The
+  provisional/confirmed tag keeps an unreviewed read from being mistaken for a
+  settled one.
+- **Confirmation reads only in-feed signals (no enrichment).** Per the issue-#6
+  scope, `confirmed` reflects PAGER/ShakeMap/review fields already present in the
+  USGS/GDACS records; the pipeline never fetches PAGER or ShakeMap itself. That
+  enrichment fetch is a later slice.
 - **Morning sitrep runs on GitHub Actions, not the harness's cloud scheduler.**
   ADR-0005 chose the harness's own routines/cron agents for deployment.
   `.github/workflows/sitrep.yml` uses a GitHub Actions `schedule` instead,

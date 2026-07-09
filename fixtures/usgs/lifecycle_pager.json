@@ -1,0 +1,28 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1783346486000,
+    "title": "USGS All Earthquakes, Past Day",
+    "count": 1
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 5.0,
+        "place": "10 km W of Testville",
+        "time": 1783300000000,
+        "updated": 1783345000000,
+        "alert": "orange",
+        "status": "automatic",
+        "tsunami": 0,
+        "sig": 385,
+        "ids": ",us8000test,",
+        "type": "earthquake",
+        "title": "M 5.0 - 10 km W of Testville"
+      },
+      "geometry": { "type": "Point", "coordinates": [12.3, 45.6, 15.0] },
+      "id": "us8000test"
+    }
+  ]
+}

@@ -16,6 +16,17 @@
   th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #5b5b57; }
   td.mag { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .empty { color: #5b5b57; font-style: italic; }
+  .tag { font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+         letter-spacing: 0.04em; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+  .tag.provisional { background: #fff3e0; color: #9a5b00; }
+  .tag.confirmed { background: #e6f4ea; color: #1b5e20; }
+  .routine { margin-top: 32px; }
+  .routine h2 { font-size: 0.95rem; color: #5b5b57; margin: 0 0 8px;
+                text-transform: uppercase; letter-spacing: 0.04em; }
+  .routine ul { list-style: none; padding: 0; margin: 0; }
+  .routine li { padding: 4px 0; border-bottom: 1px solid #efeee9;
+                color: #5b5b57; font-size: 0.9rem; }
+  .routine .mag { font-variant-numeric: tabular-nums; color: #1a1a1a; }
 </style>
 </head>
 <body>
@@ -28,29 +39,32 @@
 <section class="events">
   <table>
     <thead>
-      <tr><th>Title</th><th>Magnitude</th><th>Place</th><th>Origin time (SGT)</th></tr>
+      <tr><th>Title</th><th>Status</th><th>Magnitude</th><th>Place</th><th>Origin time (SGT)</th></tr>
     </thead>
     <tbody>
       <tr>
         <td>M 6.8 - 120 km SW of Padang, Indonesia</td>
+        <td><span class="tag provisional">provisional</span></td>
         <td class="mag">M6.8</td>
         <td>120 km SW of Padang, Indonesia</td>
         <td title="2026-07-06T01:06:40+00:00">2026-07-06 09:06 SGT</td>
       </tr>
       <tr>
         <td>M 5.1 - 42 km E of Hualien, Taiwan</td>
+        <td><span class="tag confirmed">confirmed</span></td>
         <td class="mag">M5.1</td>
         <td>42 km E of Hualien, Taiwan</td>
         <td title="2026-07-06T03:53:20+00:00">2026-07-06 11:53 SGT</td>
       </tr>
-      <tr>
-        <td>M 4.5 - 9 km NNE of Avalon, CA</td>
-        <td class="mag">M4.5</td>
-        <td>9 km NNE of Avalon, CA</td>
-        <td title="2026-07-06T06:40:00+00:00">2026-07-06 14:40 SGT</td>
-      </tr>
     </tbody>
   </table>
+
+  <section class="routine">
+    <h2>Routine / ongoing (1)</h2>
+    <ul>
+      <li><span class="mag">M4.5</span> M 4.5 - 9 km NNE of Avalon, CA — 9 km NNE of Avalon, CA <span class="tag provisional">provisional</span></li>
+    </ul>
+  </section>
 </section>
 </body>
 </html>
